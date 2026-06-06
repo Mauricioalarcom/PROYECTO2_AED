@@ -1,0 +1,8 @@
+El banano y la banana no son lo mismo, aunque suenen parecido.
+Ana ama a Banana, y Banana ama a Ana.
+La palabra abracadabra contiene patrones que se repiten: abra, cada, abra.
+Mississippi es un buen ejemplo clasico para los suffix trees,
+porque tiene muchos sufijos que comparten prefijos: issi, issippi, sippi.
+Buscar un patron como "issi" deberia encontrar varias ocurrencias.
+Este texto sirve como demo basica del buscador indexado de documentos
+construido sobre un Suffix Tree con el algoritmo de Ukkonen.

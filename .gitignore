@@ -1,0 +1,9 @@
+# Build
+/build/
+/cmake-build-debug/
+/cmake-build-release/
+*.o
+*.obj
+
+# macOS
+.DS_Store
