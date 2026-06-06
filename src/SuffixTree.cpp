@@ -268,6 +268,22 @@ std::vector<SuffixTree::NodeView> SuffixTree::exportNodes() const {
     return out;
 }
 
+std::string SuffixTree::edgeLabelById(int id) const {
+    if (id < 0 || id >= static_cast<int>(nodes_.size()) || id == root_) return "";
+    const Node& nd = nodes_[id];
+    if (nd.start < 0) return "";
+    int e = (nd.end == LEAF) ? leafEnd_ : nd.end;
+    if (e >= static_cast<int>(text_.size())) e = static_cast<int>(text_.size()) - 1;
+    std::string s = text_.substr(nd.start, e - nd.start + 1);
+    for (char& ch : s) if (ch == kTerminal) ch = '$';
+    return s;
+}
+
+int SuffixTree::nodeSuffixIndex(int id) const {
+    if (id < 0 || id >= static_cast<int>(nodes_.size())) return -1;
+    return nodes_[id].suffixIndex;
+}
+
 std::string SuffixTree::edgeLabel(const NodeView& n) const {
     if (n.id == root_ || n.start < 0) return "";
     int e = n.end;

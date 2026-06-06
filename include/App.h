@@ -67,6 +67,9 @@ private:
     void drawDocument();
     void drawHighlights(const sf::FloatRect& panel, int first, int last);
     void drawMetrics();
+    // Dibuja la ruta del patron en el arbol como una cadena vertical de aristas;
+    // devuelve la 'y' donde termino para seguir dibujando debajo.
+    float drawTreePath(float x, float y);
 
     // ---- geometria ----
     static constexpr float kRightPanelW = 380.f;  // ancho del panel de metricas

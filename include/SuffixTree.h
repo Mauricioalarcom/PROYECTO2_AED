@@ -59,6 +59,8 @@ public:
     };
     std::vector<NodeView> exportNodes() const;
     std::string edgeLabel(const NodeView& n) const;     // substring de la arista entrante
+    std::string edgeLabelById(int id) const;            // etiqueta de la arista entrante a 'id'
+    int         nodeSuffixIndex(int id) const;           // -1 si interno; >=0 si hoja
 
     const std::string& text() const { return text_; }
     int nodeCount() const { return static_cast<int>(nodes_.size()); }

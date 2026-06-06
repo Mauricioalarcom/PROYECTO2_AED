@@ -336,6 +336,49 @@ void App::drawMetrics() {
         pos += std::to_string(occ_[i]) + " ";
     if (occ_.size() > 12) pos += "...";
     put(pos, col::kMuted);
+
+    y += 8.f;
+    drawTreePath(x, y);
+}
+
+// Cadena vertical: raiz -> "etiqueta" -> [nodo] -> ... Evidencia los nodos y
+// aristas recorridos por el patron (la "ruta de busqueda" del enunciado).
+float App::drawTreePath(float x, float y) {
+    auto put = [&](const std::string& s, sf::Color c,
+                   unsigned size = 14, bool bold = false) {
+        sf::Text t(s, font_, size);
+        t.setFillColor(c);
+        if (bold) t.setStyle(sf::Text::Bold);
+        t.setPosition(x, y);
+        window_.draw(t);
+        y += size + 6.f;
+    };
+
+    put("-- Ruta en el arbol --", col::kAccent, 14, true);
+    if (!stResult_.found || stResult_.path.empty()) {
+        put("patron ausente (sin ruta)", col::kMuted);
+        return y;
+    }
+
+    const std::vector<int>& path = stResult_.path;   // path[0] = raiz
+    put("raiz", col::kText);
+
+    const int maxSteps = 8;
+    for (size_t k = 1; k < path.size(); ++k) {
+        if (static_cast<int>(k) > maxSteps) {
+            put("  ... (" + std::to_string(path.size() - 1) + " aristas en total)", col::kMuted);
+            break;
+        }
+        std::string lbl = tree_.edgeLabelById(path[k]);
+        if (lbl.size() > 16) lbl = lbl.substr(0, 16) + "..";
+        put("  | \"" + lbl + "\"", col::kMuted);
+
+        const int si = tree_.nodeSuffixIndex(path[k]);
+        std::string node = "  [n" + std::to_string(path[k]) + "]";
+        if (si >= 0) node += "  hoja@" + std::to_string(si);
+        put(node, col::kText);
+    }
+    return y;
 }
 
 void App::render() {
