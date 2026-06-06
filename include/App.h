@@ -65,6 +65,7 @@ private:
     void drawHeader();
     void drawSearchBar();
     void drawDocument();
+    void drawHighlights(const sf::FloatRect& panel, int first, int last);
     void drawMetrics();
 
     // ---- geometria ----

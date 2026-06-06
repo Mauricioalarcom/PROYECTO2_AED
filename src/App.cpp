@@ -24,6 +24,7 @@ const sf::Color kPanel     (32, 35, 43);
 const sf::Color kText      (220, 223, 228);
 const sf::Color kMuted     (140, 146, 158);
 const sf::Color kAccent    (88, 166, 255);
+const sf::Color kHighlight (70, 110, 180);   // fondo de las ocurrencias
 } // namespace col
 
 // ---------------------------------------------------------------------------
@@ -185,12 +186,49 @@ void App::drawDocument() {
     const int first = scroll_;
     const int last  = std::min(static_cast<int>(lines_.size()), first + visibleLines());
 
+    drawHighlights(p, first, last);
+
     sf::Text line("", font_, charSize_);
     line.setFillColor(col::kText);
     for (int i = first; i < last; ++i) {
         line.setString(lines_[i]);
         line.setPosition(p.left + 6.f, p.top + 4.f + (i - first) * lineHeight_);
         window_.draw(line);
+    }
+}
+
+// Dibuja un rectangulo de fondo detras de cada ocurrencia visible. Como una
+// ocurrencia [pos, pos+m) puede cruzar el corte de linea, se emite un segmento
+// por cada linea que toca.
+void App::drawHighlights(const sf::FloatRect& p, int first, int last) {
+    if (!hasResult_ || occ_.empty()) return;
+    const int m = static_cast<int>(query_.size());
+    if (m <= 0) return;
+
+    const int firstChar = first * cols_;        // primer caracter visible
+    const int lastChar  = last  * cols_;        // limite (exclusivo)
+
+    sf::RectangleShape hl;
+    hl.setFillColor(col::kHighlight);
+
+    for (int pos : occ_) {
+        const int endPos = pos + m;             // rango [pos, endPos)
+        if (endPos <= firstChar || pos >= lastChar) continue;   // fuera de vista
+
+        const int lineA = pos / cols_;
+        const int lineB = (endPos - 1) / cols_;
+        for (int ln = lineA; ln <= lineB; ++ln) {
+            if (ln < first || ln >= last) continue;
+            const int lineStart = ln * cols_;
+            const int segStart = std::max(pos, lineStart) - lineStart;            // columna inicio
+            const int segEnd   = std::min(endPos, lineStart + cols_) - lineStart; // columna fin (excl)
+            const int width    = segEnd - segStart;
+            if (width <= 0) continue;
+            hl.setSize({ width * charWidth_, lineHeight_ });
+            hl.setPosition(p.left + 6.f + segStart * charWidth_,
+                           p.top + 4.f + (ln - first) * lineHeight_);
+            window_.draw(hl);
+        }
     }
 }
 
@@ -214,6 +252,10 @@ void App::runSearch() {
     occ_ = tree_.findOccurrences(query_);
     std::sort(occ_.begin(), occ_.end());
     hasResult_ = true;
+
+    // Saltar a la primera ocurrencia para que quede a la vista.
+    if (!occ_.empty())
+        scroll_ = std::clamp(occ_.front() / cols_ - 2, 0, maxScroll());
 }
 
 void App::drawSearchBar() {
