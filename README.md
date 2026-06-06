@@ -8,9 +8,17 @@ Buscador indexado de documentos basado en un **Suffix Tree** construido con el
 
 - [x] **Parte 1** — Nucleo: Suffix Tree con Ukkonen desde cero, busqueda ingenua,
   normalizador, loader de `.txt` y demo de consola con validacion/comparacion.
-- [ ] **Parte 2** — Visualizacion con SFML (texto, barra de busqueda, ruta del
-  patron en el arbol, metricas) + benchmark de 3 tamanos (100k / 500k / 1M).
+- [x] **Parte 2** — Visualizacion con SFML: render del documento con scroll,
+  barra de busqueda, resaltado de ocurrencias, panel de metricas (Suffix Tree
+  vs ingenua) y ruta del patron recorrida en el arbol.
+- [ ] **Parte 2b** — Benchmark de 3 tamanos (100k / 500k / 1M caracteres).
 - [ ] **Parte 3** — Extraccion de PDF (poppler-cpp) detras de `DocumentLoader`.
+
+### Controles de la aplicacion (GUI)
+
+- Escribe un patron y presiona **Enter** para buscar.
+- **Backspace** borra; **flechas / rueda / RePag-AvPag / Home-End** hacen scroll.
+- **Esc** cierra.
 
 ## Estructura
 
