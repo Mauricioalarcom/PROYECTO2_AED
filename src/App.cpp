@@ -2,12 +2,20 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <iostream>
 #include <utility>
 
 #include "TextNormalizer.h"
 
 using Clock = std::chrono::high_resolution_clock;
+
+// Formatea un double con 4 decimales (para los tiempos en ms).
+static std::string fmt(double v) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.4f", v);
+    return buf;
+}
 
 // Paleta de colores de la interfaz.
 namespace col {
@@ -73,10 +81,25 @@ void App::wrapText() {
 // ---------------------------------------------------------------------------
 // Geometria
 // ---------------------------------------------------------------------------
+sf::FloatRect App::searchBar() const {
+    const auto sz = window_.getSize();
+    const float x = 20.f, y = 64.f;
+    const float w = static_cast<float>(sz.x) - x - kRightPanelW - 40.f;
+    return { x, y, w, 30.f };
+}
+
 sf::FloatRect App::docPanel() const {
     const auto sz = window_.getSize();
-    const float x = 20.f, y = 70.f;
-    return { x, y, static_cast<float>(sz.x) - 2 * x, static_cast<float>(sz.y) - y - 20.f };
+    const sf::FloatRect sb = searchBar();
+    const float y = sb.top + sb.height + 10.f;
+    return { sb.left, y, sb.width, static_cast<float>(sz.y) - y - 20.f };
+}
+
+sf::FloatRect App::metricsPanel() const {
+    const auto sz = window_.getSize();
+    const float x = static_cast<float>(sz.x) - kRightPanelW - 20.f;
+    const float y = 64.f;
+    return { x, y, kRightPanelW, static_cast<float>(sz.y) - y - 20.f };
 }
 
 int App::visibleLines() const {
@@ -95,6 +118,16 @@ void App::handleEvents() {
     while (window_.pollEvent(e)) {
         if (e.type == sf::Event::Closed)
             window_.close();
+        else if (e.type == sf::Event::TextEntered) {
+            const sf::Uint32 u = e.text.unicode;
+            if (u == 8) {                                   // backspace
+                if (!rawQuery_.empty()) rawQuery_.pop_back();
+            } else if (u == 13 || u == 10) {                // enter -> buscar
+                runSearch();
+            } else if (u >= 32 && u < 127) {                // caracter imprimible
+                rawQuery_.push_back(static_cast<char>(u));
+            }
+        }
         else if (e.type == sf::Event::KeyPressed) {
             if (e.key.code == sf::Keyboard::Escape) window_.close();
             else if (e.key.code == sf::Keyboard::Down)  ++scroll_;
@@ -161,10 +194,114 @@ void App::drawDocument() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Ejecuta la consulta: busca en el Suffix Tree y en la ingenua (para comparar),
+// midiendo ambos tiempos. El patron se normaliza igual que el texto para que
+// "Banana" coincida con "banana".
+// ---------------------------------------------------------------------------
+void App::runSearch() {
+    query_ = textnorm::normalize(rawQuery_);
+    if (query_.empty()) { hasResult_ = false; return; }
+
+    auto t0 = Clock::now();
+    stResult_ = tree_.search(query_);
+    stSearchMs_ = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
+    t0 = Clock::now();
+    nvResult_ = naive::search(text_, query_);
+    nvSearchMs_ = std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+
+    occ_ = tree_.findOccurrences(query_);
+    std::sort(occ_.begin(), occ_.end());
+    hasResult_ = true;
+}
+
+void App::drawSearchBar() {
+    const sf::FloatRect r = searchBar();
+    sf::RectangleShape box({ r.width, r.height });
+    box.setPosition(r.left, r.top);
+    box.setFillColor(col::kPanel);
+    box.setOutlineColor(col::kAccent);
+    box.setOutlineThickness(1.f);
+    window_.draw(box);
+    if (!fontLoaded_) return;
+
+    sf::Text t("", font_, 15);
+    t.setPosition(r.left + 8.f, r.top + 5.f);
+    if (rawQuery_.empty()) {
+        t.setFillColor(col::kMuted);
+        t.setString("Buscar: escribe un patron y presiona Enter...");
+    } else {
+        t.setFillColor(col::kText);
+        t.setString("Buscar: " + rawQuery_ + "_");   // cursor simple
+    }
+    window_.draw(t);
+}
+
+void App::drawMetrics() {
+    const sf::FloatRect p = metricsPanel();
+    sf::RectangleShape bg({ p.width, p.height });
+    bg.setPosition(p.left, p.top);
+    bg.setFillColor(col::kPanel);
+    window_.draw(bg);
+    if (!fontLoaded_) return;
+
+    float y = p.top + 10.f;
+    const float x = p.left + 12.f;
+    auto put = [&](const std::string& s, sf::Color c,
+                   unsigned size = 14, bool bold = false) {
+        sf::Text t(s, font_, size);
+        t.setFillColor(c);
+        if (bold) t.setStyle(sf::Text::Bold);
+        t.setPosition(x, y);
+        window_.draw(t);
+        y += size + 6.f;
+    };
+
+    put("CONSULTA", col::kAccent, 15, true);
+    if (!hasResult_) {
+        put("(sin busqueda todavia)", col::kMuted);
+        return;
+    }
+
+    put("patron: \"" + query_ + "\"  (m=" + std::to_string(query_.size()) + ")", col::kText);
+    put("coincidencias: " + std::to_string(stResult_.count), col::kText);
+    y += 6.f;
+
+    put("-- Suffix Tree --", col::kAccent, 14, true);
+    put("nodos visitados: " + std::to_string(stResult_.nodesVisited), col::kText);
+    put("comparaciones:   " + std::to_string(stResult_.charsCompared), col::kText);
+    put("tiempo busqueda: " + fmt(stSearchMs_) + " ms", col::kText);
+    y += 6.f;
+
+    put("-- Busqueda ingenua --", col::kAccent, 14, true);
+    put("comparaciones:   " + std::to_string(nvResult_.charsCompared), col::kText);
+    put("tiempo busqueda: " + fmt(nvSearchMs_) + " ms", col::kText);
+    y += 6.f;
+
+    put("-- Comparacion --", col::kAccent, 14, true);
+    const double ratio = stResult_.charsCompared > 0
+        ? static_cast<double>(nvResult_.charsCompared) / stResult_.charsCompared : 0.0;
+    put("ingenua/arbol (comparaciones): " + fmt(ratio) + "x", col::kText);
+    const bool ok = (stResult_.count == nvResult_.count);
+    put(ok ? "validacion: OK (coinciden)" : "validacion: DIFIEREN",
+        ok ? sf::Color(120, 200, 120) : sf::Color(220, 120, 120));
+    y += 6.f;
+
+    put("posiciones (" + std::to_string(occ_.size()) + "):", col::kAccent, 14, true);
+    std::string pos;
+    for (size_t i = 0; i < occ_.size() && i < 12; ++i)
+        pos += std::to_string(occ_[i]) + " ";
+    if (occ_.size() > 12) pos += "...";
+    put(pos, col::kMuted);
+}
+
 void App::render() {
     window_.clear(col::kBg);
     drawHeader();
+    drawSearchBar();
     drawDocument();
+    drawMetrics();
     window_.display();
 }
 

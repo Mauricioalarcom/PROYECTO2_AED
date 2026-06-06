@@ -5,15 +5,17 @@
 #include <string>
 #include <vector>
 
+#include "NaiveSearch.h"
 #include "SuffixTree.h"
 
 // ===========================================================================
 // Aplicacion visual (SFML) del buscador indexado de documentos.
 //
-// Parte 2.1 (este commit): ventana, carga de fuente monoespaciada, normalizado
-// y construccion del Suffix Tree, y render del texto del documento con scroll.
-// Los siguientes commits agregan la barra de busqueda, el resaltado de
-// ocurrencias, la ruta en el arbol y la comparacion contra la busqueda ingenua.
+// Parte 2.1: ventana, fuente, render del documento con scroll.
+// Parte 2.2 (este commit): barra de busqueda, ejecucion de la consulta y panel
+// de metricas con la comparacion Suffix Tree vs busqueda ingenua.
+// Los siguientes commits agregan el resaltado de ocurrencias y la ruta en el
+// arbol.
 //
 // Se usa una fuente MONOESPACIADA a proposito: con ancho de glifo constante, el
 // mapeo posicion-en-texto -> (fila, columna) es exacto y el resaltado de
@@ -44,16 +46,32 @@ private:
     std::vector<std::string> lines_;        // texto partido en lineas para mostrar
     int                      scroll_ = 0;   // indice de la primera linea visible
 
+    // ---- estado de la busqueda ----
+    std::string  rawQuery_;                 // patron tal como lo escribe el usuario
+    std::string  query_;                    // patron normalizado (el que se busca)
+    bool         hasResult_ = false;
+    SuffixTree::SearchResult stResult_;     // resultado + metricas del Suffix Tree
+    double       stSearchMs_ = 0.0;
+    naive::Result nvResult_;                // resultado + metricas de la ingenua
+    double       nvSearchMs_ = 0.0;
+    std::vector<int> occ_;                  // posiciones de las ocurrencias
+
     // ---- ciclo de vida / render ----
     bool loadFont();
     void wrapText();
     void handleEvents();
+    void runSearch();
     void render();
     void drawHeader();
+    void drawSearchBar();
     void drawDocument();
+    void drawMetrics();
 
     // ---- geometria ----
-    sf::FloatRect docPanel() const;
+    static constexpr float kRightPanelW = 380.f;  // ancho del panel de metricas
+    sf::FloatRect searchBar()   const;
+    sf::FloatRect docPanel()    const;
+    sf::FloatRect metricsPanel() const;
     int  visibleLines() const;
     int  maxScroll() const;
 };
