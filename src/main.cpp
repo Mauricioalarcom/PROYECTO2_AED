@@ -1,19 +1,17 @@
 // ===========================================================================
 // PROYECTO 2 - AED : Suffix Tree (Ukkonen) - Buscador indexado de documentos
 //
-// PARTE 1 (este archivo): demo de CONSOLA que
-//   1. carga un documento (.txt) o usa un texto de ejemplo,
-//   2. lo normaliza,
-//   3. construye el Suffix Tree con Ukkonen (midiendo el tiempo),
-//   4. ejecuta consultas (contains / count / find) y
-//   5. VALIDA y COMPARA los resultados contra la busqueda ingenua.
-//
-// La visualizacion con SFML se conecta en la Parte 2.
+// Punto de entrada. Dos modos:
+//   - GUI (por defecto): abre la aplicacion visual SFML.
+//   - Consola (--console): valida el nucleo contra la busqueda ingenua e
+//     imprime metricas. Util para verificar correctitud sin abrir ventana.
 //
 // Uso:
-//   ./PROYECTO2_AED [ruta_documento.txt] [patron1 patron2 ...]
-// Sin argumentos usa data/sample.txt (copiado junto al ejecutable).
+//   ./PROYECTO2_AED [archivo.txt]                 -> GUI con ese documento
+//   ./PROYECTO2_AED --console [archivo.txt] [patrones...]
+// Sin archivo usa data/sample.txt (copiado junto al ejecutable).
 // ===========================================================================
+#include "App.h"
 #include "DocumentLoader.h"
 #include "NaiveSearch.h"
 #include "SuffixTree.h"
@@ -30,39 +28,40 @@ static double msSince(Clock::time_point t0) {
     return std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
 }
 
-// Texto por defecto si no se pasa archivo y no existe data/sample.txt.
 static const char* kFallback =
     "el banano y la banana no son lo mismo aunque suenen parecido. "
     "ana ama a banana y banana ama a ana. abracadabra abracadabra.";
 
-static std::string loadText(int argc, char** argv) {
+// Carga el documento; devuelve el texto crudo y deja en 'label' su origen.
+static std::string loadText(const std::string& path, std::string& label) {
     std::vector<std::string> candidates;
-    if (argc > 1) candidates.push_back(argv[1]);
+    if (!path.empty()) candidates.push_back(path);
     candidates.push_back("data/sample.txt");
     candidates.push_back("../data/sample.txt");
 
-    for (const auto& path : candidates) {
+    for (const auto& p : candidates) {
         try {
-            std::string raw = docload::load(path);
-            std::cerr << "[info] documento cargado: " << path
+            std::string raw = docload::load(p);
+            std::cerr << "[info] documento cargado: " << p
                       << " (" << raw.size() << " bytes)\n";
+            label = p;
             return raw;
         } catch (const std::exception&) { /* probar siguiente */ }
     }
     std::cerr << "[info] usando texto de ejemplo embebido.\n";
+    label = "ejemplo embebido";
     return kFallback;
 }
 
+// --------------------------- modo consola ----------------------------------
 static void runQuery(const SuffixTree& st, const std::string& text,
                      const std::string& pattern) {
     std::cout << "\n--- patron: \"" << pattern << "\" (m=" << pattern.size() << ") ---\n";
 
-    // Suffix Tree (instrumentado)
     auto t0 = Clock::now();
     SuffixTree::SearchResult r = st.search(pattern);
     double stMs = msSince(t0);
 
-    // Busqueda ingenua
     t0 = Clock::now();
     naive::Result nv = naive::search(text, pattern);
     double nvMs = msSince(t0);
@@ -78,39 +77,55 @@ static void runQuery(const SuffixTree& st, const std::string& text,
               << "  comparaciones=" << nv.charsCompared
               << "  tiempo=" << nvMs << " ms\n";
     std::cout << "  VALIDACION : " << (ok ? "OK (coinciden)" : "FALLO (difieren)") << "\n";
-
-    if (r.found) {
-        std::vector<int> pos = st.findOccurrences(pattern);
-        std::cout << "  posiciones (max 10): ";
-        for (size_t i = 0; i < pos.size() && i < 10; ++i) std::cout << pos[i] << ' ';
-        if (pos.size() > 10) std::cout << "...";
-        std::cout << "\n";
-    }
 }
 
-int main(int argc, char** argv) {
-    std::cout << "==== Suffix Tree (Ukkonen) - Parte 1: validacion en consola ====\n";
+static int runConsole(const std::string& path, const std::vector<std::string>& cliPatterns) {
+    std::cout << "==== Suffix Tree (Ukkonen) - modo consola (validacion) ====\n";
 
-    std::string raw = loadText(argc, argv);
+    std::string label;
+    std::string raw  = loadText(path, label);
     std::string text = textnorm::normalize(raw);
     std::cout << "[info] texto normalizado: " << text.size() << " caracteres\n";
 
     SuffixTree st;
     auto t0 = Clock::now();
     st.buildUkkonen(text);
-    double buildMs = msSince(t0);
     std::cout << "[info] arbol construido: " << st.nodeCount()
-              << " nodos en " << buildMs << " ms\n";
+              << " nodos en " << msSince(t0) << " ms\n";
 
-    // Patrones: los pasados por CLI (argv[2..]) o un set por defecto.
-    std::vector<std::string> patterns;
-    for (int i = 2; i < argc; ++i) patterns.push_back(argv[i]);
+    std::vector<std::string> patterns = cliPatterns;
     if (patterns.empty())
-        patterns = {"ana", "banana", "ban", "abracadabra", "xyz", text.substr(0, 5)};
-
+        patterns = {"ana", "banana", "ban", "abracadabra", "xyz"};
     for (const auto& p : patterns)
         runQuery(st, text, p);
 
-    std::cout << "\n[fin] Parte 1 completada.\n";
+    std::cout << "\n[fin] modo consola completado.\n";
+    return 0;
+}
+
+// --------------------------------- main ------------------------------------
+int main(int argc, char** argv) {
+    // Separar el flag --console del resto de argumentos posicionales.
+    bool console = false;
+    std::vector<std::string> positional;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "--console") console = true;
+        else positional.push_back(a);
+    }
+
+    const std::string path = positional.empty() ? "" : positional.front();
+
+    if (console) {
+        std::vector<std::string> patterns(positional.begin() +
+            (positional.empty() ? 0 : 1), positional.end());
+        return runConsole(path, patterns);
+    }
+
+    // Modo GUI (por defecto)
+    std::string label;
+    std::string raw = loadText(path, label);
+    App app(raw, label);
+    app.run();
     return 0;
 }

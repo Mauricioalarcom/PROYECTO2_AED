@@ -31,7 +31,9 @@ target_include_directories(core PUBLIC ${CMAKE_SOURCE_DIR}/include)
 # (Parte 1: demo de consola que valida el nucleo contra la solucion ingenua.
 #  Parte 2: se conectara la visualizacion SFML.)
 # ---------------------------------------------------------------------------
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_executable(${PROJECT_NAME}
+        src/main.cpp
+        src/App.cpp)        # App.cpp usa SFML; el nucleo (core) queda libre de SFML
 target_link_libraries(${PROJECT_NAME} PRIVATE
         core
         sfml-system sfml-window sfml-graphics)
