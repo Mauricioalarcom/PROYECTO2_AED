@@ -38,5 +38,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         core
         sfml-system sfml-window sfml-graphics)
 
+# ---------------------------------------------------------------------------
+# Ejecutable de benchmark (punto 6): Suffix Tree vs busqueda ingenua en varios
+# tamanos. Enlaza solo el nucleo (no necesita SFML).
+# ---------------------------------------------------------------------------
+add_executable(benchmark src/benchmark.cpp)
+target_link_libraries(benchmark PRIVATE core)
+
 # Copia los datos de ejemplo junto al ejecutable
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
