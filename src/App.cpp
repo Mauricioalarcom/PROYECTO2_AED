@@ -394,7 +394,7 @@ void App::render() {
 // Bucle principal
 // ---------------------------------------------------------------------------
 void App::run() {
-    window_.create(sf::VideoMode(1280, 800),
+    window_.create(sf::VideoMode(1980, 1260),
                    "Proyecto 2 - Suffix Tree", sf::Style::Default);
     window_.setFramerateLimit(60);
 

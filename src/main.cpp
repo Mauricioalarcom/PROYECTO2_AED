@@ -36,8 +36,8 @@ static const char* kFallback =
 static std::string loadText(const std::string& path, std::string& label) {
     std::vector<std::string> candidates;
     if (!path.empty()) candidates.push_back(path);
-    candidates.push_back("data/sample.txt");
-    candidates.push_back("../data/sample.txt");
+    candidates.push_back("data/SuffixT1withFigures.pdf");
+    candidates.push_back("../data/SuffixT1withFigures.pdf");
 
     for (const auto& p : candidates) {
         try {
