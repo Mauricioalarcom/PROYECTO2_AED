@@ -13,7 +13,8 @@ Buscador indexado de documentos basado en un **Suffix Tree** construido con el
   vs ingenua) y ruta del patron recorrida en el arbol.
 - [x] **Parte 2b** — Benchmark de 3 tamanos (100k / 500k / 1M caracteres) con
   tabla de resultados e interpretacion (ver seccion "Experimentos").
-- [ ] **Parte 3** — Extraccion de PDF (poppler-cpp) detras de `DocumentLoader`.
+- [x] **Parte 3** — Extraccion de PDF (poppler-cpp) detras de `DocumentLoader`:
+  funciona con PDFs de texto seleccionable; soporte opcional en CMake.
 
 ### Controles de la aplicacion (GUI)
 
@@ -37,6 +38,8 @@ cada nodo (no reemplaza el nucleo algoritmico), conforme a la regla 4.
 ## Dependencias
 
 - **SFML 2.5.x** (visualizacion). En macOS: `brew install sfml@2`.
+- **poppler-cpp** (OPCIONAL, para leer PDF). En macOS: `brew install poppler pkg-config`.
+  Si no esta, el proyecto compila igual y soporta solo `.txt`.
 - CMake >= 3.28, compilador C++20.
 
 ## Compilar y ejecutar
@@ -44,10 +47,18 @@ cada nodo (no reemplaza el nucleo algoritmico), conforme a la regla 4.
 ```bash
 cmake -S . -B build
 cmake --build build
+
+# GUI (por defecto)
 ./build/PROYECTO2_AED                 # usa data/sample.txt
-./build/PROYECTO2_AED archivo.txt     # tu propio documento
-./build/PROYECTO2_AED archivo.txt issi banana   # con patrones propios
+./build/PROYECTO2_AED documento.txt   # archivo de texto
+./build/PROYECTO2_AED documento.pdf   # PDF con texto seleccionable (requiere poppler)
+
+# Modo consola (valida el indice contra la busqueda ingenua)
+./build/PROYECTO2_AED --console documento.pdf issi banana
 ```
+
+Nota sobre PDF: el indice se construye sobre el **texto extraido**, no sobre el
+binario. Los PDFs escaneados (imagen) requeririan OCR y no estan soportados.
 
 ## Experimentos (punto 6)
 
