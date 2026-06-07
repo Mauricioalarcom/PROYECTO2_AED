@@ -4,6 +4,9 @@ Buscador indexado de documentos basado en un **Suffix Tree** construido con el
 **algoritmo de Ukkonen** (O(n)), comparado contra una **busqueda ingenua**
 (busqueda directa en texto). Estructura asignada: **Suffix Tree** (Opcion D).
 
+> Explicacion completa del algoritmo (fases, suffix links, active point,
+> remainder, ejemplo paso a paso) y resultados: ver **[REPORTE.md](REPORTE.md)**.
+
 ## Estado del proyecto
 
 - [x] **Parte 1** — Nucleo: Suffix Tree con Ukkonen desde cero, busqueda ingenua,
