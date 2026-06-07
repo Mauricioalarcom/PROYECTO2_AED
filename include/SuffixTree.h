@@ -3,7 +3,8 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
+
+#include "ChildMap.h"
 
 // ===========================================================================
 // Suffix Tree construido con el ALGORITMO DE UKKONEN (construccion O(n)).
@@ -16,10 +17,9 @@
 //   - caracter terminal unico al final del texto,
 //   - hojas con indice de sufijo para recuperar ocurrencias.
 //
-// Nota sobre std::unordered_map: se usa UNICAMENTE como adyacencia auxiliar
-// de aristas (hijo por caracter) dentro de cada nodo. No reemplaza el nucleo
-// algoritmico, que es la construccion incremental de Ukkonen. Esto cae dentro
-// de "estructuras auxiliares basicas" permitidas por la regla 4.
+// La adyacencia de hijos por caracter usa ChildMap, una tabla hash propia
+// (ver ChildMap.h). NO se usa std::map / std::set / std::unordered_map en
+// ninguna parte del proyecto, conforme a la regla 4 del enunciado.
 // ===========================================================================
 class SuffixTree {
 public:
@@ -72,11 +72,11 @@ private:
     static constexpr int LEAF = -1;   // marca de "end" para hojas (usa leafEnd_)
 
     struct Node {
-        int start;                                  // inicio de la arista entrante
-        int end;                                    // fin (inclusivo); LEAF para hojas
-        int suffixLink = 0;                         // 0 = raiz (fallback de Ukkonen)
-        int suffixIndex = -1;                       // indice de sufijo (solo hojas)
-        std::unordered_map<char, int> children;     // adyacencia auxiliar por caracter
+        int start;                  // inicio de la arista entrante
+        int end;                    // fin (inclusivo); LEAF para hojas
+        int suffixLink = 0;         // 0 = raiz (fallback de Ukkonen)
+        int suffixIndex = -1;       // indice de sufijo (solo hojas)
+        ChildMap children;          // adyacencia por caracter (tabla hash propia)
         Node(int s, int e) : start(s), end(e) {}
     };
 

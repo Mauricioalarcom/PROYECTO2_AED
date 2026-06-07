@@ -44,19 +44,20 @@ void SuffixTree::extend(int pos) {
             activeEdge_ = pos;          // mirar el caracter actual
 
         const char ae = text_[activeEdge_];
+        const unsigned char aeKey = static_cast<unsigned char>(ae);
 
-        auto it = nodes_[activeNode_].children.find(ae);
-        if (it == nodes_[activeNode_].children.end()) {
+        const int existing = nodes_[activeNode_].children.get(aeKey);
+        if (existing < 0) {
             // ---- Regla 2: no existe arista; crear una hoja ----
             const int leaf = newNode(pos, LEAF);
-            nodes_[activeNode_].children[ae] = leaf;
+            nodes_[activeNode_].children.set(aeKey, leaf);
 
             if (lastNewNode_ != -1) {           // resolver suffix link pendiente
                 nodes_[lastNewNode_].suffixLink = activeNode_;
                 lastNewNode_ = -1;
             }
         } else {
-            const int next = it->second;
+            const int next = existing;
             if (walkDown(next)) continue;       // bajar y reintentar
 
             // ---- Regla 3: el caracter ya esta sobre la arista ----
@@ -72,13 +73,13 @@ void SuffixTree::extend(int pos) {
             // ---- Regla 2: dividir la arista (split) ----
             const int splitEnd = nodes_[next].start + activeLength_ - 1;
             const int split = newNode(nodes_[next].start, splitEnd);
-            nodes_[activeNode_].children[ae] = split;
+            nodes_[activeNode_].children.set(aeKey, split);
 
             const int leaf = newNode(pos, LEAF);
-            nodes_[split].children[text_[pos]] = leaf;
+            nodes_[split].children.set(static_cast<unsigned char>(text_[pos]), leaf);
 
             nodes_[next].start += activeLength_;
-            nodes_[split].children[text_[nodes_[next].start]] = next;
+            nodes_[split].children.set(static_cast<unsigned char>(text_[nodes_[next].start]), next);
 
             if (lastNewNode_ != -1)
                 nodes_[lastNewNode_].suffixLink = split;
@@ -147,12 +148,14 @@ void SuffixTree::finalize() {
         if (f.phase == 0) {
             nd.suffixIndex = -1;                // nodo interno
             st.push({f.node, f.height, 1});     // volver despues de los hijos
-            for (const auto& kv : nd.children)
-                st.push({kv.second, f.height + edgeLength(kv.second), 0});
+            nd.children.forEach([&](unsigned char, int child) {
+                st.push({child, f.height + edgeLength(child), 0});
+            });
         } else {
             int total = 0;
-            for (const auto& kv : nd.children)
-                total += leafCount_[kv.second];
+            nd.children.forEach([&](unsigned char, int child) {
+                total += leafCount_[child];
+            });
             leafCount_[f.node] = total;
         }
     }
@@ -173,11 +176,10 @@ bool SuffixTree::matchPattern(const std::string& pattern, int& matchEnd,
     int i = 0;
     while (i < m) {
         const char c = pattern[i];
-        auto it = nodes_[node].children.find(c);
-        if (it == nodes_[node].children.end())
+        const int child = nodes_[node].children.get(static_cast<unsigned char>(c));
+        if (child < 0)
             return false;                       // no hay arista: patron ausente
 
-        const int child = it->second;
         if (nodesVisited) ++(*nodesVisited);
         if (path) path->push_back(child);
 
@@ -208,8 +210,7 @@ void SuffixTree::collectLeaves(int node, std::vector<int>& out) const {
             if (nd.suffixIndex >= 0)
                 out.push_back(nd.suffixIndex);
         } else {
-            for (const auto& kv : nd.children)
-                st.push(kv.second);
+            nd.children.forEach([&](unsigned char, int child) { st.push(child); });
         }
     }
 }
@@ -259,8 +260,7 @@ std::vector<SuffixTree::NodeView> SuffixTree::exportNodes() const {
         v.suffixLink = nd.suffixLink;
         v.suffixIndex = nd.suffixIndex;
         v.isLeaf = nd.children.empty();
-        for (const auto& kv : nd.children)
-            v.children.push_back(kv.second);
+        nd.children.forEach([&](unsigned char, int child) { v.children.push_back(child); });
     }
     for (int i = 0; i < static_cast<int>(out.size()); ++i)
         for (int c : out[i].children)
