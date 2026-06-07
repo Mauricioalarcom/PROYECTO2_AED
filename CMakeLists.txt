@@ -16,6 +16,24 @@ find_package(SFML 2.5.1 COMPONENTS system window graphics REQUIRED)
 message(STATUS "SFML encontrado: ${SFML_VERSION}")
 
 # ---------------------------------------------------------------------------
+# poppler-cpp (OPCIONAL) para extraer texto de PDFs con texto seleccionable.
+# Si no esta instalado, el proyecto compila igual pero solo soporta .txt.
+# Instalar en macOS: `brew install poppler pkg-config`
+# ---------------------------------------------------------------------------
+find_package(PkgConfig QUIET)
+set(HAVE_POPPLER FALSE)
+if(PkgConfig_FOUND)
+    pkg_check_modules(POPPLER_CPP QUIET poppler-cpp)
+    if(POPPLER_CPP_FOUND)
+        set(HAVE_POPPLER TRUE)
+        message(STATUS "poppler-cpp encontrado: ${POPPLER_CPP_VERSION} (soporte PDF habilitado)")
+    endif()
+endif()
+if(NOT HAVE_POPPLER)
+    message(STATUS "poppler-cpp NO encontrado (solo .txt). Instala: brew install poppler pkg-config")
+endif()
+
+# ---------------------------------------------------------------------------
 # Libreria con el nucleo del proyecto (reutilizable por main y por benchmark)
 # ---------------------------------------------------------------------------
 add_library(core STATIC
@@ -25,6 +43,14 @@ add_library(core STATIC
         src/DocumentLoader.cpp
 )
 target_include_directories(core PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+# Conectar poppler-cpp al nucleo (DocumentLoader.cpp lo usa para PDF).
+if(HAVE_POPPLER)
+    target_compile_definitions(core PUBLIC HAVE_POPPLER=1)
+    target_include_directories(core PRIVATE ${POPPLER_CPP_INCLUDE_DIRS})
+    target_link_libraries(core PUBLIC ${POPPLER_CPP_LIBRARIES})
+    target_link_directories(core PUBLIC ${POPPLER_CPP_LIBRARY_DIRS})
+endif()
 
 # ---------------------------------------------------------------------------
 # Ejecutable principal
