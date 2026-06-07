@@ -190,10 +190,13 @@ su subárbol **todas** las ocurrencias (las hojas).
 | `findOccurrences(P)` | localizar + recoger `k` hojas | `O(m + k)` |
 | Búsqueda **ingenua** | escaneo directo del texto | `O(n·m)` peor; `~O(n)` promedio |
 
-> Nota: los hijos de cada nodo se guardan en un `std::unordered_map<char,int>`
-> **como adyacencia auxiliar** (lookup `O(1)` promedio). Esto **no** reemplaza el
-> núcleo —la construcción de Ukkonen, los suffix links y el active point son
-> propios—, conforme a la regla 4 del enunciado.
+> Nota (regla 4): **no se usa** `std::map` / `std::set` / `std::unordered_map`
+> en ninguna parte. La adyacencia de hijos por carácter se implementa con
+> **`ChildMap`** (`ChildMap.h`), una **tabla hash propia** con direccionamiento
+> abierto y sondeo lineal, respaldada por un `std::vector` (contenedor básico
+> permitido). El hashing, el sondeo, el factor de carga y el rehash son propios.
+> Además de cumplir la regla, resultó **más rápida** que `unordered_map` (tablas
+> diminutas con sondeo lineal son más cache-friendly que los buckets enlazados).
 
 ---
 
@@ -230,28 +233,29 @@ Reproducir con `./build/benchmark` (genera `data/benchmark_results.csv`).
 
 | n (chars) | m | construcción (ms) | consulta ST (µs) | consulta ingenua (µs) | nodos ST | comp. ST | comp. ingenua | speedup |
 |----------:|--:|------------------:|-----------------:|----------------------:|---------:|---------:|--------------:|--------:|
-| 100 000   | 4 | 107.2  | 0.26 | 1 473  | 3.1 | 4  | 108 848   | 5 698× |
-| 100 000   | 8 | 107.2  | 0.44 | 1 491  | 5.0 | 8  | 109 919   | 3 377× |
-| 100 000   |16 | 107.2  | 0.66 | 1 484  | 6.6 | 16 | 109 676   | 2 245× |
-| 500 000   | 4 | 573.6  | 0.28 | 7 464  | 3.4 | 4  | 549 491   | 26 962× |
-| 500 000   | 8 | 573.6  | 0.42 | 7 519  | 4.8 | 8  | 554 029   | 17 862× |
-| 500 000   |16 | 573.6  | 0.73 | 7 604  | 7.6 | 16 | 557 103   | 10 472× |
-| 1 000 000 | 4 | 1 258  | 0.27 | 14 999 | 3.3 | 4  | 1 103 940 | 55 875× |
-| 1 000 000 | 8 | 1 258  | 0.45 | 14 757 | 5.1 | 8  | 1 093 534 | 33 098× |
-| 1 000 000 |16 | 1 258  | 0.73 | 14 790 | 7.7 | 16 | 1 095 068 | 20 148× |
+| 100 000   | 4 | 74.8  | 0.13 | 1 493  | 3.1 | 4  | 108 848   | 11 864× |
+| 100 000   | 8 | 74.8  | 0.23 | 1 534  | 5.0 | 8  | 109 919   | 6 747× |
+| 100 000   |16 | 74.8  | 0.38 | 1 523  | 6.6 | 16 | 109 676   | 3 983× |
+| 500 000   | 4 | 426.1 | 0.13 | 7 687  | 3.4 | 4  | 549 491   | 57 570× |
+| 500 000   | 8 | 426.1 | 0.23 | 7 812  | 4.8 | 8  | 554 029   | 34 430× |
+| 500 000   |16 | 426.1 | 0.44 | 8 552  | 7.6 | 16 | 557 103   | 19 602× |
+| 1 000 000 | 4 | 960.6 | 0.14 | 17 210 | 3.3 | 4  | 1 103 940 | 118 815× |
+| 1 000 000 | 8 | 960.6 | 0.25 | 16 928 | 5.1 | 8  | 1 093 534 | 66 603× |
+| 1 000 000 |16 | 960.6 | 0.41 | 15 275 | 7.7 | 16 | 1 095 068 | 37 351× |
 
 ### Interpretación
 
-- **Construcción `O(n)`:** 107 → 573 → 1258 ms al pasar de 100k a 1M (≈ lineal;
-  el ligero sobrecosto es el factor constante del hash de hijos).
+- **Construcción `O(n)`:** 75 → 426 → 961 ms al pasar de 100k a 1M (≈ lineal;
+  la adyacencia de hijos usa `ChildMap`, tabla hash propia más cache-friendly
+  que `std::unordered_map`).
 - **Consulta del Suffix Tree `O(m)`, independiente de `n`:** el tiempo
-  (~0.26–0.73 µs) y las comparaciones (**= exactamente `m`**) **no cambian** al
+  (~0.13–0.44 µs) y las comparaciones (**= exactamente `m`**) **no cambian** al
   crecer el texto; solo dependen de la longitud del patrón.
 - **Consulta ingenua `O(n)`:** tiempo y comparaciones (~`n`) crecen linealmente
-  con el texto (1.5k → 7.5k → 15k µs). El patrón casi no influye porque la
+  con el texto (1.5k → 7.7k → 17k µs). El patrón casi no influye porque la
   mayoría de posiciones falla en el primer carácter.
 - **Speedup creciente:** la ventaja del índice **aumenta con `n`** (de
-  ~2 000–5 700× en 100k a ~20 000–55 000× en 1M). Es el intercambio esperado:
+  ~4 000–11 800× en 100k a ~37 000–118 000× en 1M). Es el intercambio esperado:
   se paga la construcción una vez a cambio de consultas casi gratuitas.
 - **Efecto de `m`:** a mayor `m` se recorre más profundo el árbol (más
   nodos/comparaciones) y hay menos ocurrencias, pero la consulta sigue en el
@@ -265,7 +269,7 @@ Reproducir con `./build/benchmark` (genera `data/benchmark_results.csv`).
   `O(m + k)` por consulta, frente al `O(n·m)`/`O(n)` de la ingenua.
 - La construcción `O(n)` se paga **una sola vez**; a partir de ahí las consultas
   son prácticamente independientes del tamaño del documento, lo que se confirma
-  empíricamente (speedup de hasta ~55 000× en 1M de caracteres).
+  empíricamente (speedup de hasta ~118 000× en 1M de caracteres).
 - La estructura encaja de forma natural en un buscador indexado de documentos
   (TXT/PDF), cumpliendo el objetivo del proyecto: demostrar que una estructura
   avanzada mejora de forma medible una solución ingenua.

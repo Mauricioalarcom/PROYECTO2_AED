@@ -28,15 +28,16 @@ Buscador indexado de documentos basado en un **Suffix Tree** construido con el
 ## Estructura
 
 ```
-include/   SuffixTree.h  NaiveSearch.h  TextNormalizer.h  DocumentLoader.h
-src/       SuffixTree.cpp NaiveSearch.cpp TextNormalizer.cpp DocumentLoader.cpp main.cpp
-data/      sample.txt
+include/   SuffixTree.h  ChildMap.h  NaiveSearch.h  TextNormalizer.h  DocumentLoader.h
+src/       SuffixTree.cpp NaiveSearch.cpp TextNormalizer.cpp DocumentLoader.cpp App.cpp main.cpp benchmark.cpp
+data/      (documentos de entrada .txt / .pdf)
 ```
 
 El nucleo (Suffix Tree de Ukkonen) esta implementado **desde cero**: nodos
 propios, suffix links, active point, remainder y caracter terminal unico.
-`std::unordered_map` se usa solo como adyacencia auxiliar de aristas dentro de
-cada nodo (no reemplaza el nucleo algoritmico), conforme a la regla 4.
+**No se usa** `std::map` / `std::set` / `std::unordered_map` en ninguna parte
+(regla 4): la adyacencia de hijos por caracter usa `ChildMap`, una tabla hash
+propia (direccionamiento abierto + sondeo lineal, sobre `std::vector`).
 
 ## Dependencias
 
@@ -81,28 +82,29 @@ cmake --build build
 
 | n (chars) | m | construccion (ms) | consulta ST (us) | consulta ingenua (us) | nodos ST | comp. ST | comp. ingenua | speedup |
 |----------:|--:|------------------:|-----------------:|----------------------:|---------:|---------:|--------------:|--------:|
-| 100 000   | 4 | 107.2  | 0.26 | 1 473  | 3.1 | 4  | 108 848   | 5 698x  |
-| 100 000   | 8 | 107.2  | 0.44 | 1 491  | 5.0 | 8  | 109 919   | 3 377x  |
-| 100 000   |16 | 107.2  | 0.66 | 1 484  | 6.6 | 16 | 109 676   | 2 245x  |
-| 500 000   | 4 | 573.6  | 0.28 | 7 464  | 3.4 | 4  | 549 491   | 26 962x |
-| 500 000   | 8 | 573.6  | 0.42 | 7 519  | 4.8 | 8  | 554 029   | 17 862x |
-| 500 000   |16 | 573.6  | 0.73 | 7 604  | 7.6 | 16 | 557 103   | 10 472x |
-| 1 000 000 | 4 | 1 258  | 0.27 | 14 999 | 3.3 | 4  | 1 103 940 | 55 875x |
-| 1 000 000 | 8 | 1 258  | 0.45 | 14 757 | 5.1 | 8  | 1 093 534 | 33 098x |
-| 1 000 000 |16 | 1 258  | 0.73 | 14 790 | 7.7 | 16 | 1 095 068 | 20 148x |
+| 100 000   | 4 | 74.8  | 0.13 | 1 493  | 3.1 | 4  | 108 848   | 11 864x |
+| 100 000   | 8 | 74.8  | 0.23 | 1 534  | 5.0 | 8  | 109 919   | 6 747x  |
+| 100 000   |16 | 74.8  | 0.38 | 1 523  | 6.6 | 16 | 109 676   | 3 983x  |
+| 500 000   | 4 | 426.1 | 0.13 | 7 687  | 3.4 | 4  | 549 491   | 57 570x |
+| 500 000   | 8 | 426.1 | 0.23 | 7 812  | 4.8 | 8  | 554 029   | 34 430x |
+| 500 000   |16 | 426.1 | 0.44 | 8 552  | 7.6 | 16 | 557 103   | 19 602x |
+| 1 000 000 | 4 | 960.6 | 0.14 | 17 210 | 3.3 | 4  | 1 103 940 | 118 815x |
+| 1 000 000 | 8 | 960.6 | 0.25 | 16 928 | 5.1 | 8  | 1 093 534 | 66 603x  |
+| 1 000 000 |16 | 960.6 | 0.41 | 15 275 | 7.7 | 16 | 1 095 068 | 37 351x  |
 
 ### Interpretacion
 
-- **Construccion O(n):** 107 -> 573 -> 1258 ms al pasar de 100k a 1M (≈ lineal;
-  el ligero sobrecosto viene del factor constante del hash de hijos por nodo).
-- **Consulta del Suffix Tree O(m), independiente de n:** el tiempo (~0.26-0.73 us)
+- **Construccion O(n):** 75 -> 426 -> 961 ms al pasar de 100k a 1M (≈ lineal;
+  la adyacencia de hijos usa ChildMap, una tabla hash propia con sondeo lineal,
+  mas cache-friendly que std::unordered_map).
+- **Consulta del Suffix Tree O(m), independiente de n:** el tiempo (~0.13-0.44 us)
   y las comparaciones (= exactamente m) **no cambian** al crecer el texto; solo
   dependen de la longitud del patron.
 - **Consulta ingenua O(n):** tiempo y comparaciones (~n) crecen de forma lineal
-  con el tamano del texto (1.5k -> 7.5k -> 15k us; el patron casi no influye
+  con el tamano del texto (1.5k -> 7.7k -> 17k us; el patron casi no influye
   porque la mayoria de posiciones falla en el primer caracter).
-- **Speedup creciente:** la ventaja del indice **aumenta con n** (de ~2 000-5 700x
-  en 100k a ~20 000-55 000x en 1M). Es el costo de construir el indice una vez a
+- **Speedup creciente:** la ventaja del indice **aumenta con n** (de ~4 000-11 800x
+  en 100k a ~37 000-118 000x en 1M). Es el costo de construir el indice una vez a
   cambio de consultas casi gratis: util cuando se consulta muchas veces el mismo
   documento (como un Ctrl+F indexado).
 - **Efecto de m:** a mayor m, mas profundo se recorre el arbol (mas nodos/comparaciones)
