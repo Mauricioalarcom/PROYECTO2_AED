@@ -29,10 +29,39 @@ const sf::Color kHighlight (70, 110, 180);   // fondo de las ocurrencias
 
 // ---------------------------------------------------------------------------
 // Construccion: normaliza el texto y construye el Suffix Tree (mide el tiempo).
+// Para PDF, normaliza pagina por pagina para conservar los offsets de pagina
+// en el texto normalizado.
 // ---------------------------------------------------------------------------
-App::App(std::string rawText, std::string sourceLabel)
+App::App(std::string rawText, std::vector<int> rawPageStarts, std::string sourceLabel)
     : source_(std::move(sourceLabel)) {
-    text_ = textnorm::normalize(rawText);
+
+    if (rawPageStarts.empty()) {
+        // TXT o texto embebido: no hay informacion de pagina.
+        text_ = textnorm::normalize(rawText);
+        totalPages_ = 0;
+    } else {
+        // PDF: normaliza cada pagina por separado para saber donde empieza cada
+        // una en el texto normalizado. Se agrega un espacio separador entre
+        // paginas (equivalente al '\n' que loadPdf inserta y que el normalizador
+        // colapsaria de todos modos).
+        totalPages_ = static_cast<int>(rawPageStarts.size());
+        pageStartsNorm_.reserve(totalPages_);
+        for (int p = 0; p < totalPages_; ++p) {
+            const int rawStart = rawPageStarts[p];
+            const int rawEnd   = (p + 1 < totalPages_)
+                                 ? rawPageStarts[p + 1]
+                                 : static_cast<int>(rawText.size());
+            const std::string normPage =
+                textnorm::normalize(rawText.substr(rawStart, rawEnd - rawStart));
+
+            // El separador que se insertara ANTES de este bloque (si procede).
+            const int sep = (!text_.empty() && !normPage.empty()) ? 1 : 0;
+            pageStartsNorm_.push_back(static_cast<int>(text_.size()) + sep);
+
+            if (sep) text_ += ' ';
+            text_ += normPage;
+        }
+    }
 
     const auto t0 = Clock::now();
     tree_.buildUkkonen(text_);
@@ -41,7 +70,20 @@ App::App(std::string rawText, std::string sourceLabel)
     std::cerr << "[app] origen=" << source_
               << "  chars=" << text_.size()
               << "  nodos=" << tree_.nodeCount()
+              << "  paginas=" << totalPages_
               << "  construccion=" << buildMs_ << " ms\n";
+}
+
+// Busqueda binaria: ultima pagina cuyo offset normalizado <= normPos.
+int App::getPage(int normPos) const {
+    if (pageStartsNorm_.empty()) return -1;
+    int lo = 0, hi = static_cast<int>(pageStartsNorm_.size()) - 1;
+    while (lo < hi) {
+        const int mid = (lo + hi + 1) / 2;
+        if (pageStartsNorm_[mid] <= normPos) lo = mid;
+        else hi = mid - 1;
+    }
+    return lo + 1;  // pagina 1-based
 }
 
 // ---------------------------------------------------------------------------
@@ -330,11 +372,33 @@ void App::drawMetrics() {
         ok ? sf::Color(120, 200, 120) : sf::Color(220, 120, 120));
     y += 6.f;
 
+    // Paginas (solo PDF): lista de paginas distintas donde aparece el patron.
+    if (totalPages_ > 0 && !occ_.empty()) {
+        std::string pgStr;
+        int prevPg = -1, shown = 0;
+        for (int p : occ_) {          // occ_ esta ordenado
+            const int pg = getPage(p);
+            if (pg != prevPg) {
+                if (shown > 0) pgStr += ' ';
+                pgStr += std::to_string(pg);
+                prevPg = pg;
+                if (++shown >= 10 && occ_.size() > static_cast<size_t>(shown))
+                    { pgStr += " ..."; break; }
+            }
+        }
+        put("paginas: " + pgStr, col::kText);
+    }
+
     put("posiciones (" + std::to_string(occ_.size()) + "):", col::kAccent, 14, true);
     std::string pos;
-    for (size_t i = 0; i < occ_.size() && i < 12; ++i)
-        pos += std::to_string(occ_[i]) + " ";
-    if (occ_.size() > 12) pos += "...";
+    for (size_t i = 0; i < occ_.size() && i < 10; ++i) {
+        const int pg = getPage(occ_[i]);
+        if (pg > 0)
+            pos += "p" + std::to_string(pg) + ":" + std::to_string(occ_[i]) + " ";
+        else
+            pos += std::to_string(occ_[i]) + " ";
+    }
+    if (occ_.size() > 10) pos += "...";
     put(pos, col::kMuted);
 
     y += 8.f;

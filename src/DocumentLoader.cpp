@@ -39,9 +39,8 @@ std::string loadTxt(const std::string& path) {
 }
 
 #ifdef HAVE_POPPLER
-// Extrae el texto seleccionable de un PDF concatenando el texto de cada pagina.
-// El Suffix Tree se construye sobre ESTE texto, no sobre el binario del PDF.
-std::string loadPdf(const std::string& path) {
+// Extrae texto y offsets de inicio de pagina de un PDF con texto seleccionable.
+static LoadResult loadPdfFull(const std::string& path) {
     std::unique_ptr<poppler::document> doc(
         poppler::document::load_from_file(path));
     if (!doc)
@@ -50,19 +49,23 @@ std::string loadPdf(const std::string& path) {
         throw std::runtime_error("El PDF esta protegido/encriptado: " + path);
 
     std::string out;
+    std::vector<int> pageStarts;
     const int pages = doc->pages();
     for (int i = 0; i < pages; ++i) {
+        pageStarts.push_back(static_cast<int>(out.size()));
         std::unique_ptr<poppler::page> pg(doc->create_page(i));
         if (!pg) continue;
         const poppler::byte_array utf8 = pg->text().to_utf8();
         out.append(utf8.begin(), utf8.end());
-        out.push_back('\n');     // separador entre paginas
+        out.push_back('\n');
     }
     if (out.empty())
         throw std::runtime_error(
             "El PDF no tiene texto seleccionable (quiza es escaneado/imagen): " + path);
-    return out;
+    return {out, pageStarts};
 }
+
+std::string loadPdf(const std::string& path) { return loadPdfFull(path).text; }
 #else
 std::string loadPdf(const std::string& /*path*/) {
     throw std::runtime_error(
@@ -75,6 +78,21 @@ std::string load(const std::string& path) {
     switch (detectType(path)) {
         case Type::Txt: return loadTxt(path);
         case Type::Pdf: return loadPdf(path);
+        default:
+            throw std::runtime_error("Formato no soportado (use .txt o .pdf): " + path);
+    }
+}
+
+LoadResult loadFull(const std::string& path) {
+    switch (detectType(path)) {
+        case Type::Txt: return { loadTxt(path), {} };
+        case Type::Pdf:
+#ifdef HAVE_POPPLER
+            return loadPdfFull(path);
+#else
+            loadPdf(path);   // lanza "soporte no compilado"
+            return {};
+#endif
         default:
             throw std::runtime_error("Formato no soportado (use .txt o .pdf): " + path);
     }

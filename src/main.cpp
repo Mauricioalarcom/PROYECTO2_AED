@@ -32,7 +32,7 @@ static const char* kFallback =
     "el banano y la banana no son lo mismo aunque suenen parecido. "
     "ana ama a banana y banana ama a ana. abracadabra abracadabra.";
 
-// Carga el documento; devuelve el texto crudo y deja en 'label' su origen.
+// Carga el documento para modo consola: solo texto crudo.
 static std::string loadText(const std::string& path, std::string& label) {
     std::vector<std::string> candidates;
     if (!path.empty()) candidates.push_back(path);
@@ -51,6 +51,28 @@ static std::string loadText(const std::string& path, std::string& label) {
     std::cerr << "[info] usando texto de ejemplo embebido.\n";
     label = "ejemplo embebido";
     return kFallback;
+}
+
+// Carga el documento para modo GUI: texto + offsets de pagina (PDF).
+static docload::LoadResult loadDoc(const std::string& path, std::string& label) {
+    std::vector<std::string> candidates;
+    if (!path.empty()) candidates.push_back(path);
+    candidates.push_back("data/SuffixT1withFigures.pdf");
+    candidates.push_back("../data/SuffixT1withFigures.pdf");
+
+    for (const auto& p : candidates) {
+        try {
+            docload::LoadResult r = docload::loadFull(p);
+            std::cerr << "[info] documento cargado: " << p
+                      << " (" << r.text.size() << " bytes, "
+                      << r.pageStarts.size() << " paginas)\n";
+            label = p;
+            return r;
+        } catch (const std::exception&) { /* probar siguiente */ }
+    }
+    std::cerr << "[info] usando texto de ejemplo embebido.\n";
+    label = "ejemplo embebido";
+    return { std::string(kFallback), {} };
 }
 
 // --------------------------- modo consola ----------------------------------
@@ -124,8 +146,8 @@ int main(int argc, char** argv) {
 
     // Modo GUI (por defecto)
     std::string label;
-    std::string raw = loadText(path, label);
-    App app(raw, label);
+    docload::LoadResult doc = loadDoc(path, label);
+    App app(std::move(doc.text), std::move(doc.pageStarts), label);
     app.run();
     return 0;
 }

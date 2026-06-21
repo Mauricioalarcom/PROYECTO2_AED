@@ -23,15 +23,25 @@
 // ===========================================================================
 class App {
 public:
-    App(std::string rawText, std::string sourceLabel);
+    // rawPageStarts: offsets en el texto crudo donde empieza cada pagina del PDF;
+    // vacio para archivos .txt o texto embebido (sin informacion de pagina).
+    App(std::string rawText, std::vector<int> rawPageStarts, std::string sourceLabel);
     void run();
 
 private:
     // ---- datos / nucleo ----
-    std::string source_;     // etiqueta del origen (nombre de archivo)
+    std::string source_;
     std::string text_;       // texto normalizado: lo que se indexa Y lo que se muestra
     SuffixTree  tree_;
     double      buildMs_ = 0.0;
+
+    // ---- tracking de paginas (solo para PDF) ----
+    std::vector<int> pageStartsNorm_;  // offset en text_ donde empieza cada pagina
+    int              totalPages_ = 0;
+
+    // Devuelve el numero de pagina (1-based) de la posicion normPos en text_.
+    // Retorna -1 si no hay informacion de pagina.
+    int getPage(int normPos) const;
 
     // ---- ventana / recursos ----
     sf::RenderWindow window_;
