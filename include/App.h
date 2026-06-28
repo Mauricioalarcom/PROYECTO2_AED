@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "DocumentLoader.h"
 #include "NaiveSearch.h"
 #include "SuffixTree.h"
 
@@ -23,17 +24,23 @@
 // ===========================================================================
 class App {
 public:
+    App() = default;
     // rawPageStarts: offsets en el texto crudo donde empieza cada pagina del PDF;
     // vacio para archivos .txt o texto embebido (sin informacion de pagina).
     App(std::string rawText, std::vector<int> rawPageStarts, std::string sourceLabel);
     void run();
+    void requestLoadFromPath(const std::string& path);
 
 private:
+    enum class Screen { Import, Viewer };
+
     // ---- datos / nucleo ----
+    Screen       screen_ = Screen::Import;
     std::string source_;
     std::string text_;       // texto normalizado: lo que se indexa Y lo que se muestra
     SuffixTree  tree_;
     double      buildMs_ = 0.0;
+    bool        hasDocument_ = false;
 
     // ---- tracking de paginas (solo para PDF) ----
     std::vector<int> pageStartsNorm_;  // offset en text_ donde empieza cada pagina
@@ -50,11 +57,16 @@ private:
     unsigned int charSize_   = 16;
     float        charWidth_  = 9.f;   // avance de glifo (constante en monoespaciada)
     float        lineHeight_ = 20.f;
+    sf::Vector2u lastWindowSize_{};
 
     // ---- layout del documento ----
     int                      cols_ = 80;    // columnas por linea (segun ancho del panel)
     std::vector<std::string> lines_;        // texto partido en lineas para mostrar
     int                      scroll_ = 0;   // indice de la primera linea visible
+
+    // ---- pantalla de importacion ----
+    std::string importPath_;
+    std::string statusMessage_;
 
     // ---- estado de la busqueda ----
     std::string  rawQuery_;                 // patron tal como lo escribe el usuario
@@ -67,11 +79,17 @@ private:
     std::vector<int> occ_;                  // posiciones de las ocurrencias
 
     // ---- ciclo de vida / render ----
+    void setDocument(docload::LoadResult doc, std::string sourceLabel);
+    void clearSearchState();
+    void refreshLayout();
     bool loadFont();
     void wrapText();
     void handleEvents();
     void runSearch();
     void render();
+    void drawBackground();
+    void drawImportScreen();
+    void drawViewerScreen();
     void drawHeader();
     void drawSearchBar();
     void drawDocument();
@@ -83,11 +101,24 @@ private:
 
     // ---- geometria ----
     static constexpr float kRightPanelW = 380.f;  // ancho del panel de metricas
+    static constexpr float kLeftMargin = 24.f;
+    static constexpr float kTopBarH = 52.f;
     sf::FloatRect searchBar()   const;
     sf::FloatRect docPanel()    const;
     sf::FloatRect metricsPanel() const;
+    sf::FloatRect importCard() const;
+    sf::FloatRect importField() const;
+    sf::FloatRect importPrimaryButton() const;
+    sf::FloatRect importSecondaryButton() const;
+    sf::FloatRect viewerButton() const;
     int  visibleLines() const;
     int  maxScroll() const;
+
+    // ---- utilidades ----
+    static std::string trim(const std::string& s);
+    static std::string baseName(const std::string& path);
+    static std::string openPdfDialog();
+    static bool hit(const sf::FloatRect& r, sf::Vector2f p);
 };
 
 #endif // APP_H

@@ -7,9 +7,9 @@
 //     imprime metricas. Util para verificar correctitud sin abrir ventana.
 //
 // Uso:
-//   ./PROYECTO2_AED [archivo.txt]                 -> GUI con ese documento
+//   ./PROYECTO2_AED [archivo.txt o pdf]           -> GUI con carga inicial opcional
 //   ./PROYECTO2_AED --console [archivo.txt] [patrones...]
-// Sin archivo usa data/sample.txt (copiado junto al ejecutable).
+// Sin archivo abre la interfaz de importacion.
 // ===========================================================================
 #include "App.h"
 #include "DocumentLoader.h"
@@ -35,9 +35,9 @@ static const char* kFallback =
 // Carga el documento para modo consola: solo texto crudo.
 static std::string loadText(const std::string& path, std::string& label) {
     std::vector<std::string> candidates;
-    if (!path.empty()) candidates.push_back(path);
-    candidates.push_back("data/prueba_theory_of_com.pdf");
-    candidates.push_back("../data/prueba_theory_of_com.pdf");
+    if (!path.empty()) candidates.emplace_back(path);
+    candidates.emplace_back("data/prueba_theory_of_com.pdf");
+    candidates.emplace_back("../data/prueba_theory_of_com.pdf");
 
     for (const auto& p : candidates) {
         try {
@@ -51,28 +51,6 @@ static std::string loadText(const std::string& path, std::string& label) {
     std::cerr << "[info] usando texto de ejemplo embebido.\n";
     label = "ejemplo embebido";
     return kFallback;
-}
-
-// Carga el documento para modo GUI: texto + offsets de pagina (PDF).
-static docload::LoadResult loadDoc(const std::string& path, std::string& label) {
-    std::vector<std::string> candidates;
-    if (!path.empty()) candidates.push_back(path);
-    candidates.push_back("data/SuffixT1withFigures.pdf");
-    candidates.push_back("../data/SuffixT1withFigures.pdf");
-
-    for (const auto& p : candidates) {
-        try {
-            docload::LoadResult r = docload::loadFull(p);
-            std::cerr << "[info] documento cargado: " << p
-                      << " (" << r.text.size() << " bytes, "
-                      << r.pageStarts.size() << " paginas)\n";
-            label = p;
-            return r;
-        } catch (const std::exception&) { /* probar siguiente */ }
-    }
-    std::cerr << "[info] usando texto de ejemplo embebido.\n";
-    label = "ejemplo embebido";
-    return { std::string(kFallback), {} };
 }
 
 // --------------------------- modo consola ----------------------------------
@@ -144,10 +122,10 @@ int main(int argc, char** argv) {
         return runConsole(path, patterns);
     }
 
-    // Modo GUI (por defecto)
-    std::string label;
-    docload::LoadResult doc = loadDoc(path, label);
-    App app(std::move(doc.text), std::move(doc.pageStarts), label);
+    // Modo GUI (por defecto): empieza en la pantalla de importacion.
+    App app;
+    if (!path.empty())
+        app.requestLoadFromPath(path);
     app.run();
     return 0;
 }
