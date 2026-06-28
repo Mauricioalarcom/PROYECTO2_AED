@@ -41,10 +41,19 @@ propia (direccionamiento abierto + sondeo lineal, sobre `std::vector`).
 
 ## Dependencias
 
-- **SFML 2.5.x** (visualizacion). En macOS: `brew install sfml@2`.
-- **poppler-cpp** (OPCIONAL, para leer PDF). En macOS: `brew install poppler pkg-config`.
+- **SFML 2.5.x / 2.6.x** (visualizacion). En Linux suele instalarse con
+  `libsfml-dev`.
+- **poppler-cpp** (OPCIONAL, para leer PDF). En Linux suele instalarse con
+  `libpoppler-cpp-dev` y `pkg-config`.
   Si no esta, el proyecto compila igual y soporta solo `.txt`.
 - CMake >= 3.28, compilador C++20.
+
+Ejemplo en Debian/Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install cmake g++ libsfml-dev libpoppler-cpp-dev pkg-config
+```
 
 ## Compilar y ejecutar
 
@@ -61,6 +70,9 @@ cmake --build build
 ./build/PROYECTO2_AED --console documento.pdf issi banana
 ```
 
+Si tu distribucion coloca SFML en una ruta no estandar, define `SFML_DIR` antes
+de ejecutar `cmake -S . -B build`.
+
 Nota sobre PDF: el indice se construye sobre el **texto extraido**, no sobre el
 binario. Los PDFs escaneados (imagen) requeririan OCR y no estan soportados.
 
@@ -70,8 +82,8 @@ Comparacion **Suffix Tree (Ukkonen) vs busqueda ingenua** con 3 tamanos de texto
 Justificacion de tamanos: 100k = demo basica, 500k = intermedia, 1M = avanzada
 (los que sugiere el enunciado). Corpus sintetico reproducible (semilla fija) de
 palabras repetidas, asi los patrones tienen ocurrencias. Por cada tamano se
-muestrean 40 patrones de longitudes m = 4, 8 y 16. Maquina: macOS (Apple
-Silicon), build Release-like.
+muestrean 40 patrones de longitudes m = 4, 8 y 16. La prueba se puede ejecutar
+igual en Linux; la tabla siguiente es una referencia de resultados de ejemplo.
 
 Reproducir:
 

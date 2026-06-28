@@ -87,11 +87,20 @@ int App::getPage(int normPos) const {
 }
 
 // ---------------------------------------------------------------------------
-// Carga una fuente monoespaciada (intenta varias rutas tipicas de macOS).
+// Carga una fuente monoespaciada (intenta varias rutas en Linux y macOS).
 // ---------------------------------------------------------------------------
 bool App::loadFont() {
     const char* candidates[] = {
         "data/font.ttf",                                  // fuente propia si existe
+        // Rutas comunes en Linux
+        "/usr/share/fonts/TTF/VeraMono.ttf",
+        "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+        "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
+        "/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf",
+        "/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+        // Rutas de macOS (fallback)
         "/System/Library/Fonts/Supplemental/Courier New.ttf",
         "/System/Library/Fonts/Menlo.ttc",
         "/System/Library/Fonts/Monaco.ttf",
@@ -99,7 +108,7 @@ bool App::loadFont() {
     };
     for (const char* path : candidates) {
         if (font_.loadFromFile(path)) {
-            std::cerr << "[app] fuente: " << path << "\n";
+            std::cerr << "[app] fuente cargada: " << path << "\n";
             return true;
         }
     }
