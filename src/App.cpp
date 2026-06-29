@@ -335,13 +335,13 @@ int App::maxScroll() const {
 sf::FloatRect App::importCard() const {
     const auto sz = window_.getSize();
     const float w = std::min(840.f, static_cast<float>(sz.x) - 80.f);
-    const float h = 320.f;
+    const float h = 360.f;   // aumentado para acomodar hint + status sin solapamiento
     return { (static_cast<float>(sz.x) - w) * 0.5f, (static_cast<float>(sz.y) - h) * 0.45f, w, h };
 }
 
 sf::FloatRect App::importField() const {
     const sf::FloatRect c = importCard();
-    return { c.left + 32.f, c.top + 120.f, c.width - 64.f, 44.f };
+    return { c.left + 32.f, c.top + 148.f, c.width - 64.f, 44.f };  // bajado para dejar espacio al hint
 }
 
 sf::FloatRect App::importPrimaryButton() const {
@@ -349,10 +349,6 @@ sf::FloatRect App::importPrimaryButton() const {
     return { f.left, f.top + 62.f, 190.f, 42.f };
 }
 
-sf::FloatRect App::importSecondaryButton() const {
-    const sf::FloatRect f = importField();
-    return { f.left + 206.f, f.top + 62.f, 250.f, 42.f };
-}
 
 sf::FloatRect App::viewerButton() const {
     const auto sz = window_.getSize();
@@ -403,7 +399,7 @@ void App::handleEvents() {
                 if (e.key.code == sf::Keyboard::Escape) window_.close();
                 else if (e.key.code == sf::Keyboard::F2) {
                     screen_ = Screen::Import;
-                    statusMessage_ = "Arrastra un PDF, pega una ruta o usa el selector.";
+                    statusMessage_.clear();
                     importPath_ = source_;
                 }
                 else if (e.key.code == sf::Keyboard::Down)  ++scroll_;
@@ -419,19 +415,23 @@ void App::handleEvents() {
             const sf::Vector2f p(static_cast<float>(e.mouseButton.x), static_cast<float>(e.mouseButton.y));
             if (screen_ == Screen::Import) {
                 if (hit(importPrimaryButton(), p)) {
-                    requestLoadFromPath(importPath_);
-                } else if (hit(importSecondaryButton(), p)) {
-                    const std::string picked = openPdfDialog();
-                    if (!picked.empty()) {
-                        importPath_ = picked;
+                    // Si el campo tiene ruta -> cargar directo.
+                    // Si esta vacio -> abrir el selector de archivos.
+                    if (!trim(importPath_).empty()) {
                         requestLoadFromPath(importPath_);
                     } else {
-                        statusMessage_ = "No se selecciono ningun archivo.";
+                        const std::string picked = openPdfDialog();
+                        if (!picked.empty()) {
+                            importPath_ = picked;
+                            requestLoadFromPath(importPath_);
+                        } else {
+                            statusMessage_ = "No se selecciono ningun archivo.";
+                        }
                     }
                 }
             } else if (screen_ == Screen::Viewer && hit(viewerButton(), p)) {
                 screen_ = Screen::Import;
-                statusMessage_ = "Arrastra un PDF, pega una ruta o usa el selector.";
+                statusMessage_.clear();
                 importPath_ = source_;
             }
         } else if (e.type == sf::Event::Resized) {
@@ -711,23 +711,33 @@ void App::drawImportScreen() {
     accent.setFillColor(col::kAccent);
     window_.draw(accent);
 
+    // --- Titulo ---
     sf::Text title("Importar documento PDF", font_, 26);
     title.setFillColor(col::kText);
     title.setStyle(sf::Text::Bold);
     title.setPosition(card.left + 32.f, card.top + 24.f);
     window_.draw(title);
 
-    sf::Text subtitle("Pega una ruta, escribe un archivo local o abre el selector del sistema.", font_, 14);
+    // --- Subtitulo ---
+    sf::Text subtitle("Arrastra un PDF, escribe la ruta o usa el selector del sistema.", font_, 14);
     subtitle.setFillColor(col::kMuted);
     subtitle.setPosition(card.left + 32.f, card.top + 62.f);
     window_.draw(subtitle);
 
+    // --- Hint de teclas: justo debajo del subtitulo ---
+    sf::Text hint("Enter: cargar  |  F2: selector  |  Esc: salir", font_, 12);
+    hint.setFillColor(sf::Color(100, 110, 130));
+    hint.setPosition(card.left + 32.f, card.top + 84.f);
+    window_.draw(hint);
+
+    // --- Label del campo ---
     sf::Text label("Ruta del archivo:", font_, 14);
     label.setFillColor(col::kAccent);
     label.setStyle(sf::Text::Bold);
-    label.setPosition(card.left + 32.f, card.top + 96.f);
+    label.setPosition(card.left + 32.f, card.top + 120.f);
     window_.draw(label);
 
+    // --- Campo de texto ---
     const sf::FloatRect field = importField();
     sf::RectangleShape input({ field.width, field.height });
     input.setPosition(field.left, field.top);
@@ -743,6 +753,7 @@ void App::drawImportScreen() {
                                            : importPath_ + "_");
     window_.draw(pathText);
 
+    // --- Botones ---
     auto drawBtn = [&](const sf::FloatRect& r, const std::string& txt,
                        sf::Color fill, sf::Color outline, sf::Color textColor) {
         sf::RectangleShape b({ r.width, r.height });
@@ -758,25 +769,18 @@ void App::drawImportScreen() {
         window_.draw(t);
     };
 
-    drawBtn(importPrimaryButton(), "Cargar PDF/TXT", col::kAccent, col::kAccent, sf::Color::White);
-    drawBtn(importSecondaryButton(), "Abrir selector del sistema", col::kPanel2, col::kAccent2, col::kText);
+    // Boton primario: texto dinamico segun si hay ruta escrita o no.
+    const std::string primaryLabel = trim(importPath_).empty()
+        ? "Seleccionar archivo..."
+        : "Cargar PDF/TXT";
+    drawBtn(importPrimaryButton(), primaryLabel, col::kAccent, col::kAccent, sf::Color::White);
 
-#ifdef PLATFORM_MACOS
-    const std::string hintStr = "Enter: cargar | F2: selector (osascript) | Esc: salir";
-#elif defined(PLATFORM_LINUX)
-    const std::string hintStr = "Enter: cargar | F2: selector (zenity/kdialog) | Esc: salir";
-#else
-    const std::string hintStr = "Enter: cargar | Esc: salir";
-#endif
-    sf::Text hint(hintStr, font_, 13);
-    hint.setFillColor(col::kMuted);
-    hint.setPosition(card.left + 32.f, card.top + 200.f);
-    window_.draw(hint);
-
+    // --- Mensaje de estado (errores): debajo de los botones ---
     if (!statusMessage_.empty()) {
-        sf::Text status(statusMessage_, font_, 14);
+        const sf::FloatRect btnRect = importPrimaryButton();
+        sf::Text status(statusMessage_, font_, 13);
         status.setFillColor(col::kDanger);
-        status.setPosition(card.left + 32.f, card.top + 232.f);
+        status.setPosition(card.left + 32.f, btnRect.top + btnRect.height + 14.f);
         window_.draw(status);
     }
 }
@@ -857,7 +861,7 @@ void App::run() {
     refreshLayout();
     if (!hasDocument_) {
         screen_ = Screen::Import;
-        statusMessage_ = "Arrastra un PDF, pega una ruta o usa el selector del sistema.";
+        statusMessage_.clear();   // el subtitulo ya indica como cargar, no hace falta repetirlo
     } else {
         screen_ = Screen::Viewer;
     }

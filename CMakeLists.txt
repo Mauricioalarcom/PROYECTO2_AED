@@ -55,7 +55,7 @@ endif()
 # ---------------------------------------------------------------------------
 # Ejecutable principal
 # (Parte 1: demo de consola que valida el nucleo contra la solucion ingenua.
-#  Parte 2: se conectara la visualizacion SFML.)
+#  Parte 2: se conectara la visualizacion SFML.)33
 # ---------------------------------------------------------------------------
 add_executable(${PROJECT_NAME}
         src/main.cpp
