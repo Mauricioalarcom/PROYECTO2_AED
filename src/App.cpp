@@ -10,6 +10,13 @@
 
 #include "TextNormalizer.h"
 
+// Deteccion de plataforma en tiempo de compilacion.
+#if defined(__APPLE__) && defined(__MACH__)
+#  define PLATFORM_MACOS 1
+#elif defined(__linux__)
+#  define PLATFORM_LINUX 1
+#endif
+
 using Clock = std::chrono::high_resolution_clock;
 
 // Formatea un double con 4 decimales (para los tiempos en ms).
@@ -177,20 +184,89 @@ std::string App::baseName(const std::string& path) {
     return path;
 }
 
+// ---------------------------------------------------------------------------
+// Abre un selector de archivos nativo del sistema operativo.
+// macOS  : usa osascript (AppleScript) — no requiere dependencias extra.
+// Linux  : prueba zenity → kdialog → qarma → yad (en ese orden) para
+//          cubrir GNOME, KDE, entornos minimalistas y cualquier distro.
+// Devuelve la ruta seleccionada (sin saltos de linea) o "" si se cancela.
+// ---------------------------------------------------------------------------
 std::string App::openPdfDialog() {
+    auto runCmd = [](const char* cmd) -> std::string {
+        FILE* pipe = popen(cmd, "r");
+        if (!pipe) return "";
+        std::string out;
+        char buffer[512];
+        while (std::fgets(buffer, sizeof(buffer), pipe)) out += buffer;
+        int rc = pclose(pipe);
+        // pclose retorna el estado de salida del proceso; exit code != 0 =
+        // cancelado o herramienta no encontrada.
+        if (rc != 0 && out.empty()) return "";
+        return out;
+    };
+
+#ifdef PLATFORM_MACOS
+    // AppleScript: dialogo nativo de macOS, soporta multiples tipos.
     const char* cmd =
-        "zenity --file-selection --title=\"Selecciona un PDF\" "
-        "--file-filter=\"PDF files | *.pdf\" "
-        "--file-filter=\"Text files | *.txt\" 2>/dev/null";
+        "osascript -e 'tell application \"System Events\"\n"
+        "set f to choose file with prompt \"Selecciona un PDF o TXT:\"  "
+        "of type {\"pdf\", \"txt\", \"public.plain-text\"}\n"
+        "POSIX path of f\n"
+        "end tell' 2>/dev/null";
+    return trim(runCmd(cmd));
 
-    FILE* pipe = popen(cmd, "r");
-    if (!pipe) return "";
+#elif defined(PLATFORM_LINUX)
+    // Filtro comun a todas las herramientas GTK/Qt.
+    // zenity (GNOME / cualquier distro con zenity instalado)
+    {
+        const char* cmd =
+            "zenity --file-selection "
+            "--title='Selecciona un PDF o TXT' "
+            "--file-filter='Documentos | *.pdf *.txt' "
+            "--file-filter='PDF | *.pdf' "
+            "--file-filter='Texto | *.txt' "
+            "2>/dev/null";
+        std::string res = trim(runCmd(cmd));
+        if (!res.empty()) return res;
+    }
+    // kdialog (KDE Plasma)
+    {
+        const char* cmd =
+            "kdialog --getopenfilename . "
+            "'PDF y texto (*.pdf *.txt)' "
+            "2>/dev/null";
+        std::string res = trim(runCmd(cmd));
+        if (!res.empty()) return res;
+    }
+    // qarma (fork de zenity, disponible en algunos entornos)
+    {
+        const char* cmd =
+            "qarma --file-selection "
+            "--title='Selecciona un PDF o TXT' "
+            "--file-filter='Documentos | *.pdf *.txt' "
+            "2>/dev/null";
+        std::string res = trim(runCmd(cmd));
+        if (!res.empty()) return res;
+    }
+    // yad (Yet Another Dialog, otro fork popular de zenity)
+    {
+        const char* cmd =
+            "yad --file-selection "
+            "--title='Selecciona un PDF o TXT' "
+            "--file-filter='Documentos (*.pdf *.txt)|*.pdf *.txt' "
+            "2>/dev/null";
+        std::string res = trim(runCmd(cmd));
+        if (!res.empty()) return res;
+    }
+    // Ultimo recurso: xdg-open no sirve para seleccionar, indicar al usuario.
+    std::cerr << "[app] No se encontro zenity/kdialog/qarma/yad. "
+                 "Instala uno de ellos para usar el selector grafico.\n";
+    return "";
 
-    std::string out;
-    char buffer[512];
-    while (std::fgets(buffer, sizeof(buffer), pipe)) out += buffer;
-    pclose(pipe);
-    return trim(out);
+#else
+    std::cerr << "[app] Selector de archivos no disponible en esta plataforma.\n";
+    return "";
+#endif
 }
 
 bool App::hit(const sf::FloatRect& r, sf::Vector2f p) {
@@ -685,7 +761,14 @@ void App::drawImportScreen() {
     drawBtn(importPrimaryButton(), "Cargar PDF/TXT", col::kAccent, col::kAccent, sf::Color::White);
     drawBtn(importSecondaryButton(), "Abrir selector del sistema", col::kPanel2, col::kAccent2, col::kText);
 
-    sf::Text hint("Enter: cargar | F2: selector | Esc: salir", font_, 13);
+#ifdef PLATFORM_MACOS
+    const std::string hintStr = "Enter: cargar | F2: selector (osascript) | Esc: salir";
+#elif defined(PLATFORM_LINUX)
+    const std::string hintStr = "Enter: cargar | F2: selector (zenity/kdialog) | Esc: salir";
+#else
+    const std::string hintStr = "Enter: cargar | Esc: salir";
+#endif
+    sf::Text hint(hintStr, font_, 13);
     hint.setFillColor(col::kMuted);
     hint.setPosition(card.left + 32.f, card.top + 200.f);
     window_.draw(hint);

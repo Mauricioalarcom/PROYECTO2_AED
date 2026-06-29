@@ -30,7 +30,7 @@ if(PkgConfig_FOUND)
     endif()
 endif()
 if(NOT HAVE_POPPLER)
-    message(STATUS "poppler-cpp NO encontrado (solo .txt). Instala: brew install poppler pkg-config")
+    message(STATUS "poppler-cpp NO encontrado (solo .txt). Instala con:\n  Linux : sudo apt install libpoppler-cpp-dev pkg-config\n  macOS : brew install poppler pkg-config")
 endif()
 
 # ---------------------------------------------------------------------------
