@@ -1,6 +1,7 @@
 #include "SuffixTree.h"
 
 #include <stack>
+using namespace std;
 
 // ============================================================
 // Node
@@ -15,23 +16,19 @@ Node::Node(int s, int* e)
 // Constructor / destructor
 // ============================================================
 SuffixTree::SuffixTree()
-    : root_(nullptr), leafEnd_(-1), nodeCount_(0),
-      activeNode_(nullptr), activeEdge_(-1),
-      activeLength_(0), remainder_(0), lastNewNode_(nullptr) {}
+    : root(nullptr), leafEnd(-1), nNodes(0),
+      activeNode(nullptr), activeEdge(-1),
+      activeLength(0), remainder(0), lastNewNode(nullptr) {}
 
 SuffixTree::~SuffixTree() {
-    freeTree(root_);
+    freeTree(root);
 }
 
-// Libera recursivamente el subarbol de 'node'.
-// Las hojas tienen end == &leafEnd_ (miembro del arbol, no del heap);
-// los nodos internos y la raiz tienen su propio int* en el heap.
 void SuffixTree::freeTree(Node* node) {
     if (!node) return;
     for (int i = 0; i < 128; i++)
-        if (node->children[i])
-            freeTree(node->children[i]);
-    if (node->end != &leafEnd_)
+        freeTree(node->children[i]);
+    if (node->end != &leafEnd)
         delete node->end;
     delete node;
 }
@@ -39,134 +36,124 @@ void SuffixTree::freeTree(Node* node) {
 // ============================================================
 // Helpers
 // ============================================================
-
-// Crea un nodo nuevo y lo registra.
 Node* SuffixTree::newNode(int start, int* end) {
     Node* n = new Node(start, end);
-    n->suffixLink = root_;    // fallback por defecto: la raiz
-    nodeCount_++;
+    n->suffixLink = root;
+    nNodes++;
     return n;
 }
 
-// Longitud de la arista entrante al nodo (numero de caracteres).
 int SuffixTree::edgeLen(Node* node) const {
     return *node->end - node->start + 1;
 }
 
-// Skip/count trick: si el active length supera la arista, baja al nodo.
-// Devuelve true para reintentar la extension desde el nuevo active point.
 bool SuffixTree::walkDown(Node* node) {
     int len = edgeLen(node);
-    if (activeLength_ >= len) {
-        activeEdge_  += len;
-        activeLength_ -= len;
-        activeNode_   = node;
+    if (activeLength >= len) {
+        activeEdge   += len;
+        activeLength -= len;
+        activeNode    = node;
         return true;
     }
     return false;
 }
 
 // ============================================================
-// Fase de Ukkonen: inserta text_[pos] en el arbol.
+// Fase de Ukkonen
 // ============================================================
 void SuffixTree::extend(int pos) {
-    leafEnd_ = pos;       // Regla 1: extiende todas las hojas en O(1)
-    remainder_++;
-    lastNewNode_ = nullptr;
+    leafEnd = pos;
+    remainder++;
+    lastNewNode = nullptr;
 
-    while (remainder_ > 0) {
-        if (activeLength_ == 0)
-            activeEdge_ = pos;
+    while (remainder > 0) {
+        if (activeLength == 0)
+            activeEdge = pos;
 
-        int aeIdx = (unsigned char)text_[activeEdge_];
-        Node* child = activeNode_->children[aeIdx];
+        int aeIdx = (unsigned char)text[activeEdge];
+        Node* child = activeNode->children[aeIdx];
 
         if (!child) {
-            // ---- Regla 2: no existe arista; crear hoja nueva ----
-            activeNode_->children[aeIdx] = newNode(pos, &leafEnd_);
-            if (lastNewNode_) {
-                lastNewNode_->suffixLink = activeNode_;
-                lastNewNode_ = nullptr;
+            // Regla 2: crear hoja
+            activeNode->children[aeIdx] = newNode(pos, &leafEnd);
+            if (lastNewNode) {
+                lastNewNode->suffixLink = activeNode;
+                lastNewNode = nullptr;
             }
         } else {
-            if (walkDown(child)) continue;  // bajar y reintentar
+            if (walkDown(child)) continue;
 
-            // ---- Regla 3: el caracter ya existe en la arista ----
-            if (text_[child->start + activeLength_] == text_[pos]) {
-                if (lastNewNode_ && activeNode_ != root_) {
-                    lastNewNode_->suffixLink = activeNode_;
-                    lastNewNode_ = nullptr;
+            // Regla 3: el caracter ya existe
+            if (text[child->start + activeLength] == text[pos]) {
+                if (lastNewNode && activeNode != root) {
+                    lastNewNode->suffixLink = activeNode;
+                    lastNewNode = nullptr;
                 }
-                activeLength_++;
-                break;      // fin de fase; remainder queda para la siguiente
+                activeLength++;
+                break;
             }
 
-            // ---- Regla 2 (split): dividir la arista ----
-            int* splitEnd = new int(child->start + activeLength_ - 1);
+            // Regla 2: split
+            int* splitEnd = new int(child->start + activeLength - 1);
             Node* split = newNode(child->start, splitEnd);
-            activeNode_->children[aeIdx] = split;
+            activeNode->children[aeIdx] = split;
 
-            // Hoja nueva desde el punto de split hacia text_[pos]
-            split->children[(unsigned char)text_[pos]] = newNode(pos, &leafEnd_);
+            split->children[(unsigned char)text[pos]] = newNode(pos, &leafEnd);
+            child->start += activeLength;
+            split->children[(unsigned char)text[child->start]] = child;
 
-            // El nodo hijo existente arranca ahora despues del split
-            child->start += activeLength_;
-            split->children[(unsigned char)text_[child->start]] = child;
-
-            if (lastNewNode_)
-                lastNewNode_->suffixLink = split;
-            lastNewNode_ = split;
+            if (lastNewNode)
+                lastNewNode->suffixLink = split;
+            lastNewNode = split;
         }
 
-        remainder_--;
+        remainder--;
 
-        if (activeNode_ == root_ && activeLength_ > 0) {
-            // Desde la raiz: acortar la arista activa un caracter
-            activeLength_--;
-            activeEdge_ = pos - remainder_ + 1;
-        } else if (activeNode_ != root_) {
-            // Saltar por el suffix link al siguiente sufijo pendiente
-            activeNode_ = activeNode_->suffixLink;
+        if (activeNode == root && activeLength > 0) {
+            activeLength--;
+            activeEdge = pos - remainder + 1;
+        } else if (activeNode != root) {
+            activeNode = activeNode->suffixLink;
         }
     }
 }
 
 // ============================================================
-// Construccion completa del arbol
+// buildUkkonen: unico lugar donde se usa this-> porque el
+// parametro 'text' choca con el miembro 'text'
 // ============================================================
-void SuffixTree::buildUkkonen(std::string text) {
-    // Liberar arbol anterior si existe
-    freeTree(root_);
-    root_ = nullptr;
-    nodeCount_ = 0;
+void SuffixTree::buildUkkonen(string text) {
+    freeTree(root);
+    root   = nullptr;
+    nNodes = 0;
 
-    text_    = std::move(text);
-    text_   += kTerminal;   // caracter terminal unico
-    leafEnd_ = -1;
+    this->text  = std::move(text);
+    this->text += kTerminal;
+    leafEnd = -1;
 
-    // Crear la raiz (sin arista entrante; su end es propio en el heap)
-    root_ = new Node(-1, new int(-1));
-    root_->suffixLink = root_;
-    nodeCount_ = 1;
+    root = new Node(-1, new int(-1));
+    root->suffixLink = root;
+    nNodes = 1;
 
-    activeNode_  = root_;
-    activeEdge_  = -1;
-    activeLength_ = 0;
-    remainder_   = 0;
-    lastNewNode_ = nullptr;
+    activeNode   = root;
+    activeEdge   = -1;
+    activeLength = 0;
+    remainder    = 0;
+    lastNewNode  = nullptr;
 
-    for (int i = 0; i < (int)text_.size(); i++)
+    for (int i = 0; i < (int)this->text.size(); i++)
         extend(i);
 
     finalize();
 }
 
-// DFS iterativo (pre-orden): asigna suffixIndex a cada hoja.
-// suffixIndex = n - altura_en_caracteres (posicion de inicio del sufijo).
+// ============================================================
+// finalize: asigna suffixIndex a cada hoja
+// ============================================================
 void SuffixTree::finalize() {
     struct Frame { Node* node; int height; };
-    std::stack<Frame> st;
-    st.push({root_, 0});
+    stack<Frame> st;
+    st.push({root, 0});
 
     while (!st.empty()) {
         auto [node, height] = st.top();
@@ -176,28 +163,24 @@ void SuffixTree::finalize() {
         for (int c = 0; c < 128; c++) {
             if (node->children[c]) {
                 isLeaf = false;
-                int childHeight = height + edgeLen(node->children[c]);
-                st.push({node->children[c], childHeight});
+                st.push({node->children[c], height + edgeLen(node->children[c])});
             }
         }
-        if (isLeaf && node != root_)
-            node->suffixIndex = (int)text_.size() - height;
+        if (isLeaf && node != root)
+            node->suffixIndex = (int)text.size() - height;
     }
 }
 
 // ============================================================
 // Busqueda
 // ============================================================
-
-// Recorre el patron sobre el arbol. Si tiene exito, matchEnd apunta al nodo
-// cuyo subarbol contiene todas las ocurrencias. Rellena metricas opcionales.
-bool SuffixTree::matchPattern(const std::string& pat, Node*& matchEnd,
+bool SuffixTree::matchPattern(const string& pat, Node*& matchEnd,
                               int* nodesVisited, int* charsCompared,
-                              std::vector<Node*>* path) const {
-    if (pat.empty() || !root_) return false;
+                              vector<Node*>* path) const {
+    if (pat.empty() || !root) return false;
 
-    Node* node = root_;
-    if (path) path->push_back(root_);
+    Node* node = root;
+    if (path) path->push_back(root);
 
     int m = (int)pat.size();
     int i = 0;
@@ -214,7 +197,7 @@ bool SuffixTree::matchPattern(const std::string& pat, Node*& matchEnd,
         int e = *child->end;
         while (j <= e && i < m) {
             if (charsCompared) (*charsCompared)++;
-            if (text_[j] != pat[i]) return false;
+            if (text[j] != pat[i]) return false;
             j++; i++;
         }
         node = child;
@@ -224,9 +207,8 @@ bool SuffixTree::matchPattern(const std::string& pat, Node*& matchEnd,
     return true;
 }
 
-// DFS iterativo: recolecta suffixIndex de todas las hojas del subarbol.
-void SuffixTree::collectLeaves(Node* node, std::vector<int>& out) const {
-    std::stack<Node*> st;
+void SuffixTree::collectLeaves(Node* node, vector<int>& out) const {
+    stack<Node*> st;
     st.push(node);
     while (!st.empty()) {
         Node* cur = st.top(); st.pop();
@@ -242,10 +224,9 @@ void SuffixTree::collectLeaves(Node* node, std::vector<int>& out) const {
     }
 }
 
-// DFS iterativo: cuenta las hojas del subarbol.
 int SuffixTree::countLeaves(Node* node) const {
     int count = 0;
-    std::stack<Node*> st;
+    stack<Node*> st;
     st.push(node);
     while (!st.empty()) {
         Node* cur = st.top(); st.pop();
@@ -261,20 +242,23 @@ int SuffixTree::countLeaves(Node* node) const {
     return count;
 }
 
-bool SuffixTree::contains(std::string pattern) const {
+// ============================================================
+// API publica
+// ============================================================
+bool SuffixTree::contains(string pattern) const {
     Node* end = nullptr;
     return matchPattern(pattern, end, nullptr, nullptr, nullptr);
 }
 
-int SuffixTree::countOccurrences(std::string pattern) const {
+int SuffixTree::countOccurrences(string pattern) const {
     Node* end = nullptr;
     if (!matchPattern(pattern, end, nullptr, nullptr, nullptr))
         return 0;
     return countLeaves(end);
 }
 
-std::vector<int> SuffixTree::findOccurrences(std::string pattern) const {
-    std::vector<int> out;
+vector<int> SuffixTree::findOccurrences(string pattern) const {
+    vector<int> out;
     Node* end = nullptr;
     if (!matchPattern(pattern, end, nullptr, nullptr, nullptr))
         return out;
@@ -282,7 +266,7 @@ std::vector<int> SuffixTree::findOccurrences(std::string pattern) const {
     return out;
 }
 
-SuffixTree::SearchResult SuffixTree::search(std::string pattern) const {
+SuffixTree::SearchResult SuffixTree::search(string pattern) const {
     SearchResult r;
     Node* end = nullptr;
     r.found = matchPattern(pattern, end, &r.nodesVisited, &r.charsCompared, &r.path);
@@ -291,17 +275,12 @@ SuffixTree::SearchResult SuffixTree::search(std::string pattern) const {
     return r;
 }
 
-// ============================================================
-// Soporte para visualizacion
-// ============================================================
-
-// Retorna la etiqueta de la arista entrante a 'node' (subcadena de text_).
-std::string SuffixTree::edgeLabel(Node* node) const {
-    if (!node || node == root_ || node->start < 0) return "";
+string SuffixTree::edgeLabel(Node* node) const {
+    if (!node || node == root || node->start < 0) return "";
     int s = node->start;
     int e = *node->end;
-    if (e >= (int)text_.size()) e = (int)text_.size() - 1;
-    std::string lbl = text_.substr(s, e - s + 1);
+    if (e >= (int)text.size()) e = (int)text.size() - 1;
+    string lbl = text.substr(s, e - s + 1);
     for (char& ch : lbl)
         if (ch == kTerminal) ch = '$';
     return lbl;
