@@ -11,20 +11,21 @@
 // Se instrumenta con el numero de comparaciones de caracteres para comparar
 // de forma justa contra el Suffix Tree.
 // ===========================================================================
+using namespace std;
 namespace naive {
 
 struct Result {
     bool found = false;
     long long count = 0;
     long long charsCompared = 0;       // comparaciones de caracteres realizadas
-    std::vector<int> positions;        // posiciones de inicio de cada ocurrencia
+    vector<int> positions;        // posiciones de inicio de cada ocurrencia
 };
 
 // Busca todas las ocurrencias (con solapamiento) de 'pattern' en 'text'.
-Result search(const std::string& text, const std::string& pattern);
+Result search(const string& text, const string& pattern);
 
 // Solo cuenta (sin guardar posiciones), util para benchmark.
-Result count(const std::string& text, const std::string& pattern);
+Result count(const string& text, const string& pattern);
 
 } // namespace naive
 

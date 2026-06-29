@@ -3,18 +3,15 @@
 #include <stack>
 using namespace std;
 
-// ============================================================
-// Node
-// ============================================================
 Node::Node(int s, int* e)
     : start(s), end(e), suffixLink(nullptr), suffixIndex(-1) {
     for (int i = 0; i < 128; i++)
         children[i] = nullptr;
 }
 
-// ============================================================
-// Constructor / destructor
-// ============================================================
+
+// constructor y destructor owo
+
 SuffixTree::SuffixTree()
     : root(nullptr), leafEnd(-1), nNodes(0),
       activeNode(nullptr), activeEdge(-1),
@@ -33,9 +30,9 @@ void SuffixTree::freeTree(Node* node) {
     delete node;
 }
 
-// ============================================================
-// Helpers
-// ============================================================
+
+// helperss
+
 Node* SuffixTree::newNode(int start, int* end) {
     Node* n = new Node(start, end);
     n->suffixLink = root;
@@ -50,9 +47,9 @@ int SuffixTree::edgeLen(Node* node) const {
 bool SuffixTree::walkDown(Node* node) {
     int len = edgeLen(node);
     if (activeLength >= len) {
-        activeEdge   += len;
+        activeEdge += len;
         activeLength -= len;
-        activeNode    = node;
+        activeNode = node;
         return true;
     }
     return false;
@@ -70,7 +67,7 @@ void SuffixTree::extend(int pos) {
         if (activeLength == 0)
             activeEdge = pos;
 
-        int aeIdx = (unsigned char)text[activeEdge];
+        int aeIdx = text[activeEdge];
         Node* child = activeNode->children[aeIdx];
 
         if (!child) {
@@ -98,9 +95,9 @@ void SuffixTree::extend(int pos) {
             Node* split = newNode(child->start, splitEnd);
             activeNode->children[aeIdx] = split;
 
-            split->children[(unsigned char)text[pos]] = newNode(pos, &leafEnd);
+            split->children[text[pos]] = newNode(pos, &leafEnd);
             child->start += activeLength;
-            split->children[(unsigned char)text[child->start]] = child;
+            split->children[text[child->start]] = child;
 
             if (lastNewNode)
                 lastNewNode->suffixLink = split;
@@ -118,16 +115,13 @@ void SuffixTree::extend(int pos) {
     }
 }
 
-// ============================================================
-// buildUkkonen: unico lugar donde se usa this-> porque el
-// parametro 'text' choca con el miembro 'text'
-// ============================================================
+// buildUkkonen construye el Suffix Tree para el texto dado usando el algoritmo de Ukkonen.
 void SuffixTree::buildUkkonen(string text) {
     freeTree(root);
-    root   = nullptr;
+    root = nullptr;
     nNodes = 0;
 
-    this->text  = std::move(text);
+    this->text = std::move(text);
     this->text += kTerminal;
     leafEnd = -1;
 
@@ -135,11 +129,11 @@ void SuffixTree::buildUkkonen(string text) {
     root->suffixLink = root;
     nNodes = 1;
 
-    activeNode   = root;
-    activeEdge   = -1;
+    activeNode = root;
+    activeEdge = -1;
     activeLength = 0;
-    remainder    = 0;
-    lastNewNode  = nullptr;
+    remainder = 0;
+    lastNewNode = nullptr;
 
     for (int i = 0; i < (int)this->text.size(); i++)
         extend(i);
@@ -147,9 +141,8 @@ void SuffixTree::buildUkkonen(string text) {
     finalize();
 }
 
-// ============================================================
 // finalize: asigna suffixIndex a cada hoja
-// ============================================================
+
 void SuffixTree::finalize() {
     struct Frame { Node* node; int height; };
     stack<Frame> st;
@@ -171,9 +164,9 @@ void SuffixTree::finalize() {
     }
 }
 
-// ============================================================
+
 // Busqueda
-// ============================================================
+
 bool SuffixTree::matchPattern(const string& pat, Node*& matchEnd,
                               int* nodesVisited, int* charsCompared,
                               vector<Node*>* path) const {
@@ -185,8 +178,7 @@ bool SuffixTree::matchPattern(const string& pat, Node*& matchEnd,
     int m = (int)pat.size();
     int i = 0;
     while (i < m) {
-        int c = (unsigned char)pat[i];
-        if (c >= 128) return false;
+        int c = pat[i];
         Node* child = node->children[c];
         if (!child) return false;
 
@@ -242,9 +234,7 @@ int SuffixTree::countLeaves(Node* node) const {
     return count;
 }
 
-// ============================================================
-// API publica
-// ============================================================
+
 bool SuffixTree::contains(string pattern) const {
     Node* end = nullptr;
     return matchPattern(pattern, end, nullptr, nullptr, nullptr);
