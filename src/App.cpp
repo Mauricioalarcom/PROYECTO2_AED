@@ -424,23 +424,23 @@ float App::drawTreePath(float x, float y) {
         return y;
     }
 
-    const std::vector<int>& path = stResult_.path;   // path[0] = raiz
+    const std::vector<Node*>& path = stResult_.path;  // path[0] = raiz
     put("raiz", col::kText);
 
     const int maxSteps = 8;
-    for (size_t k = 1; k < path.size(); ++k) {
-        if (static_cast<int>(k) > maxSteps) {
+    for (int k = 1; k < (int)path.size(); ++k) {
+        if (k > maxSteps) {
             put("  ... (" + std::to_string(path.size() - 1) + " aristas en total)", col::kMuted);
             break;
         }
-        std::string lbl = tree_.edgeLabelById(path[k]);
+        std::string lbl = tree_.edgeLabel(path[k]);
         if (lbl.size() > 16) lbl = lbl.substr(0, 16) + "..";
         put("  | \"" + lbl + "\"", col::kMuted);
 
-        const int si = tree_.nodeSuffixIndex(path[k]);
-        std::string node = "  [n" + std::to_string(path[k]) + "]";
-        if (si >= 0) node += "  hoja@" + std::to_string(si);
-        put(node, col::kText);
+        const int si = path[k]->suffixIndex;
+        std::string nodeStr = "  [n" + std::to_string(k) + "]";
+        if (si >= 0) nodeStr += "  hoja@" + std::to_string(si);
+        put(nodeStr, col::kText);
     }
     return y;
 }

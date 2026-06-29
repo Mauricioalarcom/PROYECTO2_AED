@@ -4,107 +4,90 @@
 #include <string>
 #include <vector>
 
-#include "ChildMap.h"
+// ============================================================
+// Nodo del Suffix Tree (algoritmo de Ukkonen).
+//
+// El puntero 'end' apunta al fin de la arista entrante:
+//   - Hojas:          apuntan a leafEnd_ del arbol (se actualiza
+//                     automaticamente en cada fase -> truco O(1))
+//   - Nodos internos: tienen su propio int en el heap.
+// suffixIndex guarda el indice de inicio del sufijo (solo hojas;
+// -1 para nodos internos).
+// ============================================================
+struct Node {
+    int   start;
+    int*  end;
+    Node* suffixLink;
+    Node* children[128];
+    int   suffixIndex;
 
-// ===========================================================================
-// Suffix Tree construido con el ALGORITMO DE UKKONEN (construccion O(n)).
-//
-// Implementado DESDE CERO segun las reglas del proyecto:
-//   - nodos propios (no se usa std::map/std::set como el arbol),
-//   - suffix links explicitos,
-//   - active point (active node / active edge / active length),
-//   - remainder (numero de sufijos pendientes),
-//   - caracter terminal unico al final del texto,
-//   - hojas con indice de sufijo para recuperar ocurrencias.
-//
-// La adyacencia de hijos por caracter usa ChildMap, una tabla hash propia
-// (ver ChildMap.h). NO se usa std::map / std::set / std::unordered_map en
-// ninguna parte del proyecto, conforme a la regla 4 del enunciado.
-// ===========================================================================
+    Node(int s, int* e);
+};
+
+// ============================================================
+// Suffix Tree construido con el algoritmo de Ukkonen (O(n)).
+// Implementado desde cero; no usa std::map / std::set / std::unordered_map.
+// ============================================================
 class SuffixTree {
 public:
-    // Metricas instrumentadas de una busqueda, utiles para la visualizacion
-    // y para la comparacion experimental contra la busqueda ingenua.
+    // Metricas instrumentadas de una busqueda (para comparacion experimental).
     struct SearchResult {
-        bool found = false;
-        long long count = 0;          // numero de ocurrencias del patron
-        int nodesVisited = 0;         // nodos del arbol recorridos
-        int charsCompared = 0;        // comparaciones de caracteres realizadas
-        std::vector<int> path;        // ids de nodos en la ruta del patron
+        bool               found         = false;
+        long long          count         = 0;
+        int                nodesVisited  = 0;
+        int                charsCompared = 0;
+        std::vector<Node*> path;          // nodos recorridos (raiz -> nodo match)
     };
 
-    SuffixTree() = default;
+    SuffixTree();
+    ~SuffixTree();
 
-    // Construye el arbol sobre 'text'. Internamente agrega un caracter
-    // terminal unico (kTerminal) que NO debe aparecer en el texto.
-    void buildUkkonen(const std::string& text);
+    // Sin copia (maneja punteros crudos con new/delete).
+    SuffixTree(const SuffixTree&)            = delete;
+    SuffixTree& operator=(const SuffixTree&) = delete;
 
-    // ---- API minima exigida por el enunciado ----
-    bool contains(const std::string& pattern) const;
-    long long countOccurrences(const std::string& pattern) const;
-    std::vector<int> findOccurrences(const std::string& pattern) const; // posiciones de inicio
+    // ---- API exigida por el enunciado ----
+    void             buildUkkonen(std::string text);
+    bool             contains(std::string pattern) const;
+    int              countOccurrences(std::string pattern) const;
+    std::vector<int> findOccurrences(std::string pattern) const;
 
-    // Version instrumentada: devuelve metricas + ruta recorrida.
-    SearchResult search(const std::string& pattern) const;
+    // ---- Version instrumentada para la visualizacion ----
+    SearchResult search(std::string pattern) const;
 
-    // ---- Soporte para la visualizacion del arbol ----
-    struct NodeView {
-        int id = -1;
-        int parent = -1;
-        int start = 0, end = 0;       // arista entrante [start, end] (inclusivo) sobre el texto
-        int suffixLink = -1;
-        int suffixIndex = -1;         // -1 si es nodo interno
-        bool isLeaf = false;
-        std::vector<int> children;    // ids de hijos
-    };
-    std::vector<NodeView> exportNodes() const;
-    std::string edgeLabel(const NodeView& n) const;     // substring de la arista entrante
-    std::string edgeLabelById(int id) const;            // etiqueta de la arista entrante a 'id'
-    int         nodeSuffixIndex(int id) const;           // -1 si interno; >=0 si hoja
+    // ---- Soporte para visualizar la ruta del patron en el arbol ----
+    std::string        edgeLabel(Node* node) const;
+    int                nodeCount() const { return nodeCount_; }
+    const std::string& getText()   const { return text_; }
 
-    const std::string& text() const { return text_; }
-    int nodeCount() const { return static_cast<int>(nodes_.size()); }
-
-    // Caracter terminal unico ('\x01'): el texto normalizado nunca debe contenerlo.
+    // Caracter terminal unico (nunca aparece en texto normalizado).
     static constexpr char kTerminal = '\x01';
 
 private:
-    static constexpr int LEAF = -1;   // marca de "end" para hojas (usa leafEnd_)
+    std::string text_;      // texto indexado (con kTerminal al final)
+    Node*       root_;
+    int         leafEnd_;   // fin global de las hojas (truco de Ukkonen)
+    int         nodeCount_;
 
-    struct Node {
-        int start;                  // inicio de la arista entrante
-        int end;                    // fin (inclusivo); LEAF para hojas
-        int suffixLink = 0;         // 0 = raiz (fallback de Ukkonen)
-        int suffixIndex = -1;       // indice de sufijo (solo hojas)
-        ChildMap children;          // adyacencia por caracter (tabla hash propia)
-        Node(int s, int e) : start(s), end(e) {}
-    };
+    // Active point (estado del algoritmo de Ukkonen)
+    Node* activeNode_;
+    int   activeEdge_;      // indice en text_ del primer char de la arista activa
+    int   activeLength_;
+    int   remainder_;
+    Node* lastNewNode_;     // ultimo nodo interno sin suffix link resuelto
 
-    std::string text_;
-    std::vector<Node> nodes_;
-    std::vector<int> leafCount_;     // hojas en el subarbol (para countOccurrences en O(1))
+    Node* newNode(int start, int* end);
+    void  freeTree(Node* node);
+    int   edgeLen(Node* node) const;
+    bool  walkDown(Node* node);
+    void  extend(int pos);
+    void  finalize();
 
-    // ---- Estado del algoritmo de Ukkonen ----
-    int root_ = 0;
-    int activeNode_ = 0;
-    int activeEdge_ = -1;            // indice dentro de text_
-    int activeLength_ = 0;
-    int remainder_ = 0;             // sufijos pendientes
-    int leafEnd_ = -1;              // fin global de las hojas (truco de Ukkonen)
-    int lastNewNode_ = -1;
-
-    int newNode(int start, int end);
-    int edgeLength(int node) const;
-    bool walkDown(int node);
-    void extend(int pos);
-    void finalize();                 // calcula suffixIndex y leafCount con un DFS
-
-    // Recorre el patron por el arbol. Si tiene exito, 'matchEnd' es el nodo cuyo
-    // subarbol contiene todas las ocurrencias. Rellena metricas opcionales.
-    bool matchPattern(const std::string& pattern, int& matchEnd,
+    bool matchPattern(const std::string& pat, Node*& matchEnd,
                       int* nodesVisited, int* charsCompared,
-                      std::vector<int>* path) const;
-    void collectLeaves(int node, std::vector<int>& out) const;
+                      std::vector<Node*>* path) const;
+    void collectLeaves(Node* node, std::vector<int>& out) const;
+    int  countLeaves(Node* node) const;
 };
 
 #endif // SUFFIX_TREE_H
