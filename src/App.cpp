@@ -395,12 +395,24 @@ void App::handleEvents() {
                         requestLoadFromPath(importPath_);
                     }
                 }
+                else if (e.key.code == sf::Keyboard::V && (e.key.control || e.key.system)) {
+                    std::string clip = sf::Clipboard::getString().toAnsiString();
+                    for (char c : clip) {
+                        if (c >= 32 && c < 127) importPath_.push_back(c);
+                    }
+                }
             } else {
                 if (e.key.code == sf::Keyboard::Escape) window_.close();
                 else if (e.key.code == sf::Keyboard::F2) {
                     screen_ = Screen::Import;
                     statusMessage_.clear();
                     importPath_ = source_;
+                }
+                else if (e.key.code == sf::Keyboard::V && (e.key.control || e.key.system)) {
+                    std::string clip = sf::Clipboard::getString().toAnsiString();
+                    for (char c : clip) {
+                        if (c >= 32 && c < 127) rawQuery_.push_back(c);
+                    }
                 }
                 else if (e.key.code == sf::Keyboard::Down)  ++scroll_;
                 else if (e.key.code == sf::Keyboard::Up)    --scroll_;
